@@ -1,4 +1,4 @@
-// @bessel/spice: a typed, promise-based API over CSPICE-WASM running in a Web
+// cspice-wasm: a typed, promise-based API over CSPICE-WASM running in a Web
 // Worker. Phase 0 implements the engine and the worker transport; this module
 // is the public surface the renderer and geometry layers call.
 
@@ -197,6 +197,20 @@ export interface SpiceEngine {
     observer: string,
   ): Promise<Float64Array>;
 
+  /**
+   * Batched spkezr over an epoch array: one call returns n*6 interleaved states
+   * (x,y,z km then vx,vy,vz km/s) plus n light times, transferred zero-copy from
+   * the worker. The batched-states primitive under the frames tier's
+   * StateProvider (ADR M-0002).
+   */
+  spkezrBatch(
+    target: string,
+    etArray: Float64Array,
+    frame: string,
+    abcorr: AberrationCorrection,
+    observer: string,
+  ): Promise<StateBatchArrays>;
+
   /** Instrument field of view: shape, frame, boresight, and boundary vectors. */
   getfov(instId: number, room?: number): Promise<FovResult>;
   bodvrd(body: string, item: string): Promise<number[]>;
@@ -344,6 +358,16 @@ export interface DskShape {
 /** Row-major 3x3 rotation matrix. */
 export type Mat3 = readonly number[];
 
+/**
+ * A zero-copy state batch: n*6 interleaved states (x,y,z km, then vx,vy,vz
+ * km/s per epoch) and n one-way light times (s). Both arrays are JS-owned and
+ * transferable across the worker boundary.
+ */
+export interface StateBatchArrays {
+  readonly states: Float64Array;
+  readonly lightTimes: Float64Array;
+}
+
 export interface FovResult {
   readonly shape: string;
   readonly frame: string;
@@ -399,7 +423,8 @@ export interface SpiceComputeEngine extends SpiceEngine {
 }
 
 export type { SpiceWorkerRequest, SpiceWorkerResponse } from './protocol.ts';
-export { createSpiceEngine, type SpiceEngineOptions } from './engine.ts';
+export { SpiceBindings } from './bindings.ts';
+export { createSpiceBindings, createSpiceEngine, type SpiceEngineOptions } from './engine.ts';
 export { createSpiceWorkerClient } from './client.ts';
 export { createSpiceWorkerPool, type SpiceWorkerPool } from './pool.ts';
 export { installSpiceWorker, dispatchSpice, JobCancelledError, type SpiceWorkerScope } from './worker-core.ts';

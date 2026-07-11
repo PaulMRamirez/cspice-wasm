@@ -1,7 +1,7 @@
 {
-  "name": "@bessel/spice",
-  "description": "Typed, promise-based CSPICE-WASM engine for ephemeris, frames, and geometry events, in-process or in a Web Worker",
-  "version": "0.0.0",
+  "name": "cspice-wasm",
+  "description": "NAIF CSPICE compiled to WebAssembly with a typed full-surface wrapper, worker pool, and zero-copy batch API; extracted from bessel's spice layer per ADR M-0002 (the npm name is reserved; this workspace package is the internal publication)",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,8 +11,5 @@
     "./wasm/cspice.mjs": "./wasm/cspice.mjs",
     "./wasm/cspice.wasm": "./wasm/cspice.wasm"
   },
-  "types": "./src/index.ts",
-  "dependencies": {
-    "@bessel/pal": "workspace:*"
-  }
+  "types": "./src/index.ts"
 }
