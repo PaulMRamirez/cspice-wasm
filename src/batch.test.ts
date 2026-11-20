@@ -10,7 +10,7 @@ import { installSpiceWorker, type SpiceWorkerScope } from './worker-core.ts';
 import type { SpiceWorkerRequest, SpiceWorkerResponse } from './protocol.ts';
 
 const fixture = (name: string) =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 
 describe('cspice-wasm spkposBatch (F3 batching)', () => {
   let spice: SpiceEngine;

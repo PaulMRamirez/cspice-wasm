@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createSpiceEngine, type SpiceEngine } from './index.ts';
 
 const fixture = (name: string) =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 
 const CASSINI = '-82';
 const STEP = 120; // seconds; shorter than the shadow ingress/egress events

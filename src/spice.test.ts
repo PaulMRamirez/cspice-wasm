@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createSpiceEngine, SpiceError, type SpiceEngine } from './index.ts';
 
 const fixture = (name: string) =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 
 // Reference values pinned from de440s at 2004-07-01T00:00:00 (see module header).
 const REF = {

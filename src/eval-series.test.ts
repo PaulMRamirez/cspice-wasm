@@ -21,7 +21,7 @@ import {
 import type { SpiceWorkerRequest, SpiceWorkerResponse } from './protocol.ts';
 
 const fixture = (name: string) =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 const KERNELS = ['naif0012.tls', 'de440s-inner-cassini.bsp'] as const;
 
 // A fake Worker backed by an in-process engine, so the client/pool can be exercised

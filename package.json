@@ -1,27 +1,55 @@
 {
   "name": "cspice-wasm",
-  "description": "NAIF CSPICE compiled to WebAssembly with a typed full-surface wrapper, worker pool, and zero-copy batch API; extracted from bessel's spice layer per ADR M-0002 (the npm name is reserved; this workspace package is the internal publication)",
+  "description": "NAIF CSPICE compiled to WebAssembly: a typed, promise-based API with a worker pool and zero-copy batch calls, for browsers and Node.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PaulMRamirez/cspice-wasm.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "src",
+    "wasm",
+    "!src/**/*.test.ts",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
       "import": "./dist/index.js"
     },
     "./worker": {
       "types": "./dist/worker.d.ts",
-      "development": "./src/worker.ts",
       "import": "./dist/worker.js"
     },
     "./worker-core": {
       "types": "./dist/worker-core.d.ts",
-      "development": "./src/worker-core.ts",
       "import": "./dist/worker-core.js"
     },
     "./wasm/cspice.mjs": "./wasm/cspice.mjs",
     "./wasm/cspice.wasm": "./wasm/cspice.wasm"
   },
-  "types": "./dist/index.d.ts"
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "verify": "pnpm typecheck && pnpm build && pnpm test",
+    "prepare": "tsc -p tsconfig.build.json",
+    "cspice:build": "bash scripts/build-cspice.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "packageManager": "pnpm@9.15.0"
 }
