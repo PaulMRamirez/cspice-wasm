@@ -20,3 +20,55 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
+
+  # Second build target: CSPICE as a glue-free WASI 0.1 module restricted to the Wasm
+  # MVP. Rebuilds it from the pinned sources, proves the committed module is what the
+  # script produces, scans every opcode, checks the values against the Emscripten
+  # build in Node's WASI host and in SpaceWasm, and uploads the modules and the
+  # measurements behind docs/wasi-mvp-measurements.md.
+  wasi:
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang-18
+      AR: llvm-ar-18
+      NM: llvm-nm-18
+      OBJCOPY: llvm-objcopy-18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the WebAssembly toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 llvm-18 libclang-rt-18-dev-wasm32
+      - name: Build the WASI modules
+        run: |
+          sha256sum wasm/cspice.wasi.wasm | tee committed.sha256
+          bash scripts/build-cspice-wasi.sh
+      - name: The committed module is reproducible from the script
+        run: sha256sum --check committed.sha256
+      - name: Strict MVP validation
+        run: node scripts/check-wasm-mvp.mjs wasm/cspice.wasi.wasm wasm/cspice-driver.wasi.wasm
+      - name: Smoke test against the Emscripten build (node:wasi)
+        run: node --no-warnings scripts/wasi-smoke.mjs
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/spacewasm
+            ~/.cargo/registry
+            bench/spacewasm-host/target
+          key: wasi-cargo-${{ runner.os }}-spacewasm-0.8.0-rc.3-${{ hashFiles('bench/spacewasm-host/Cargo.lock') }}
+      - name: Install the SpaceWasm ground tool
+        run: command -v spacewasm || cargo install spacewasm_tools --version =0.8.0-rc.3 --locked
+      - name: Measure under SpaceWasm
+        run: bash scripts/wasi-measure.sh | tee wasi-measurements.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cspice-wasi-mvp
+          path: |
+            wasm/cspice.wasi.wasm
+            wasm/cspice-driver.wasi.wasm
+            wasi-measurements.txt
+            wasi-measurements.json
