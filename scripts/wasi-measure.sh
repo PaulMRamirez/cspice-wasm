@@ -28,6 +28,7 @@ echo "cpus: $(nproc 2>/dev/null)"
 node --version
 cargo --version
 "${CC:-clang}" --version | head -n 1
+"${WASM_OPT:-wasm-opt}" --version 2>/dev/null
 
 section "static module facts (scripts/check-wasm-mvp.mjs)"
 node scripts/check-wasm-mvp.mjs "$REACTOR" "$DRIVER" || status=1

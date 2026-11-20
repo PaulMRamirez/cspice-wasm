@@ -19,10 +19,11 @@ wall times are from that one shared machine and moved by 10 to 30 percent betwee
 so treat them as indicative. Counts (bytes, functions, instructions, slices, system
 calls) are deterministic and were identical on every run.
 
-Toolchain: Ubuntu clang 18.1.3 and wasm-ld 18 (`apt` packages `clang`, `lld`, `llvm`,
-`libclang-rt-18-dev-wasm32`); wasi-libc at commit `574b88da` (the `wasi-sdk-25` tag),
+Toolchain: Ubuntu clang 18.1.3 and wasm-ld 18, binaryen 108 (`apt` packages `clang`,
+`lld`, `llvm`, `binaryen`, `libclang-rt-18-dev-wasm32`); wasi-libc at commit `574b88da` (the `wasi-sdk-25` tag),
 built by the script at `-mcpu=mvp` with `BULK_MEMORY_SOURCES=` emptied; CSPICE from
-arturania/cspice at `53bce326`; Node 22.23.5; Rust 1.97.0; `spacewasm`,
+arturania/cspice at `53bce326`, compiled at `-O2`, then the linked module optimized
+with `wasm-opt -O2 --mvp-features --enable-mutable-globals`; Node 22.23.5; Rust 1.97.0; `spacewasm`,
 `spacewasm_tools` 0.8.0-rc.3 from crates.io with `wasi-common` and `wiggle` 28.0.1.
 
 Commands, all from the repository root:
@@ -159,10 +160,21 @@ a DataCount section and `memory.copy`/`memory.fill` in `memcpy`, `memmove`, and
 `-mcpu=mvp` (about 15 s). The `apt` compiler-rt builtins archive is tagged with sign
 extension too; none of the builtins this link pulls in uses a sign-extension opcode
 (the scan proves it), but the linker copies the tag into the `target_features` custom
-section, so the script removes that section. A different export set could pull in a
+section, so the script removes that section before optimizing and gives `wasm-opt` the
+MVP feature set explicitly. A different export set could pull in a
 builtin that does use one; the scan in the build script and in CI would then fail
 loudly, and the fix would be to build the builtins from source at `-mcpu=mvp`. wasi-sdk
 release sysroots were not downloaded or tested here.
+
+An implicit optimizer made the first CI run differ from the local build: when a link
+line carries `-O2`, clang 18 silently runs whatever `wasm-opt` is on `PATH`. The local
+machine had binaryen and the CI runner did not, so CI produced the unoptimized link
+(1,723,235 bytes, 1,518 functions) and the reproducibility check failed. The script now
+links without `-O`, requires `wasm-opt`, and invokes it explicitly; the output is
+byte-identical to the module measured here. For scale, the unoptimized link compiles to
+974,209 IR words and costs 86,547 instructions per steady-state LT+S `spkezr_c`, and
+`wasm-opt -Os` gives 1,451,836 bytes, 928,564 IR words, and 81,412 instructions, so the
+optimizer level moves these numbers by a few percent at most.
 
 `setjmp`, `longjmp`: not used by the CSPICE sources at this commit (searched), so
 nothing needed stubbing. `signal` (libf2c's `sig_die.c`, `signal_.c`) and `clock`

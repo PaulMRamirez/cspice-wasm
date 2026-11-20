@@ -41,7 +41,7 @@ jobs:
       - name: Install the WebAssembly toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-18 lld-18 llvm-18 libclang-rt-18-dev-wasm32
+          sudo apt-get install -y clang-18 lld-18 llvm-18 binaryen libclang-rt-18-dev-wasm32
       - name: Build the WASI modules
         run: |
           sha256sum wasm/cspice.wasi.wasm | tee committed.sha256

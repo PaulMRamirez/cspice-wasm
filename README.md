@@ -93,8 +93,9 @@ directly, and kernels are read by path from a directory the host preopens. The t
 TypeScript API does not use this module; it is a separate artifact for other hosts.
 
 `pnpm cspice:build:wasi` (`scripts/build-cspice-wasi.sh`) needs clang and wasm-ld with
-the WebAssembly backend, the LLVM binutils, `make`, `git`, and the compiler-rt builtins
-for wasm32 (on Ubuntu 24.04: `clang lld llvm libclang-rt-18-dev-wasm32`). It builds its
+the WebAssembly backend, the LLVM binutils, binaryen's `wasm-opt`, `make`, `git`, and
+the compiler-rt builtins for wasm32 (on Ubuntu 24.04: `clang lld llvm binaryen
+libclang-rt-18-dev-wasm32`). It builds its
 own wasi-libc at `-mcpu=mvp`, because stock sysroots use bulk memory, and it also links
 `wasm/cspice-driver.wasi.wasm`, a command-style driver for hosts that only run
 `_start`. `pnpm check:wasi` scans every opcode and fails on anything outside Wasm 1.0

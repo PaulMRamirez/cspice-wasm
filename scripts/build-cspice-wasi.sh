@@ -21,10 +21,13 @@
 #
 # Usage: bash scripts/build-cspice-wasi.sh   (or: pnpm cspice:build:wasi)
 # Requires: clang and wasm-ld with the WebAssembly backend, llvm-ar, llvm-nm,
-# llvm-objcopy, make, git, node, and the compiler-rt builtins for wasm32 (Ubuntu:
-# apt-get install clang lld llvm libclang-rt-18-dev-wasm32). Tested with clang 18.1.3.
-# Environment overrides: CSPICE_COMMIT, WASI_LIBC_COMMIT, CC, AR, NM, OBJCOPY,
-# WASI_SYSROOT (use an existing MVP sysroot instead of building one), STACK_SIZE, JOBS.
+# llvm-objcopy, binaryen's wasm-opt, make, git, node, and the compiler-rt builtins for
+# wasm32 (Ubuntu 24.04: apt-get install clang lld llvm binaryen
+# libclang-rt-18-dev-wasm32). Tested with clang 18.1.3 and binaryen 108; the committed
+# module is byte-identical only with those versions.
+# Environment overrides: CSPICE_COMMIT, WASI_LIBC_COMMIT, CC, AR, NM, OBJCOPY, WASM_OPT,
+# WASM_OPT_LEVEL, WASI_SYSROOT (use an existing MVP sysroot instead of building one),
+# STACK_SIZE, JOBS.
 
 set -euo pipefail
 
@@ -43,6 +46,8 @@ CC="${CC:-clang}"
 AR="${AR:-llvm-ar}"
 NM="${NM:-llvm-nm}"
 OBJCOPY="${OBJCOPY:-llvm-objcopy}"
+WASM_OPT="${WASM_OPT:-wasm-opt}"
+WASM_OPT_LEVEL="${WASM_OPT_LEVEL:--O2}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 2)}"
 # Linear-memory stack for the guest, in bytes. CSPICE keeps nearly all of its state in
 # static storage, so this is far below the 5 MB the Emscripten target reserves; see
@@ -50,6 +55,9 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || echo 2)}"
 STACK_SIZE="${STACK_SIZE:-1048576}"
 
 TARGET_FLAGS=(--target=wasm32-wasi -mcpu=mvp)
+
+command -v "$WASM_OPT" >/dev/null 2>&1 ||
+  { echo "wasm-opt (binaryen) is required; install it or set WASM_OPT" >&2; exit 1; }
 
 mkdir -p "$OUT" "$BUILD"
 
@@ -111,32 +119,44 @@ fi
 # 3. Link. --stack-first puts the stack below the data so an overflow traps instead of
 #    silently overwriting SPICE's static state. No -Wl,--import-memory: the module owns
 #    its memory, and the declared minimum is whatever CSPICE's static arrays need.
+#    The link line carries no -O flag on purpose: with one, clang silently runs
+#    whatever wasm-opt is on PATH with features guessed from the objects, so the output
+#    would depend on the machine. Step 4 runs wasm-opt explicitly instead.
 EXPORT_FLAGS=()
 for sym in $(grep -v '^#' "$REPO_ROOT/scripts/cspice-exports.txt"); do
   EXPORT_FLAGS+=("-Wl,--export=$sym")
 done
-LINK_COMMON=("${TARGET_FLAGS[@]}" --sysroot="$SYSROOT" -O2
+LINK_COMMON=("${TARGET_FLAGS[@]}" --sysroot="$SYSROOT"
   -Wl,--stack-first -Wl,-z,stack-size="$STACK_SIZE" -Wl,--strip-all
   -lwasi-emulated-signal -lwasi-emulated-process-clocks -lwasi-emulated-getpid)
 
+SHIM_OBJ="$BUILD/cspice_wasi_shim.o"
+DRIVER_OBJ="$BUILD/driver.o"
+"$CC" "${CFLAGS[@]}" -c "$REPO_ROOT/scripts/wasi/cspice_wasi_shim.c" -o "$SHIM_OBJ"
+"$CC" "${CFLAGS[@]}" -c "$REPO_ROOT/scripts/wasi/driver.c" -o "$DRIVER_OBJ"
+
 echo "Linking wasm/cspice.wasi.wasm (reactor) ..."
-"$CC" "${CFLAGS[@]}" -mexec-model=reactor "$REPO_ROOT/scripts/wasi/cspice_wasi_shim.c" "$LIB" \
-  "${LINK_COMMON[@]}" "${EXPORT_FLAGS[@]}" -o "$OUT/cspice.wasi.wasm"
+"$CC" -mexec-model=reactor "$SHIM_OBJ" "$LIB" \
+  "${LINK_COMMON[@]}" "${EXPORT_FLAGS[@]}" -o "$BUILD/cspice.wasi.linked.wasm"
 
 echo "Linking wasm/cspice-driver.wasi.wasm (command) ..."
-"$CC" "${CFLAGS[@]}" "$REPO_ROOT/scripts/wasi/driver.c" \
-  "$REPO_ROOT/scripts/wasi/cspice_wasi_shim.c" "$LIB" \
-  "${LINK_COMMON[@]}" -o "$OUT/cspice-driver.wasi.wasm"
+"$CC" "$DRIVER_OBJ" "$SHIM_OBJ" "$LIB" \
+  "${LINK_COMMON[@]}" -o "$BUILD/cspice-driver.wasi.linked.wasm"
 
-# The apt compiler-rt builtins archive is tagged as built for sign extension, and the
-# linker copies that tag into the target_features custom section even when no such
-# instruction is linked. Drop the section so the module does not advertise a feature it
-# does not use; the opcode scan below is what actually proves the claim.
-for m in cspice.wasi.wasm cspice-driver.wasi.wasm; do
-  "$OBJCOPY" --remove-section=target_features "$OUT/$m"
+# 4. Optimize with binaryen, held to the MVP. The apt compiler-rt builtins archive is
+#    tagged as built for sign extension, and the linker copies that tag into the
+#    target_features custom section even when no such instruction is linked; left in
+#    place it would license wasm-opt to emit sign-extension opcodes. So the section is
+#    dropped first and the feature set is given explicitly: wasm-opt then refuses any
+#    input instruction outside it and cannot introduce one.
+echo "Optimizing with $("$WASM_OPT" --version) at $WASM_OPT_LEVEL, MVP features only ..."
+for m in cspice.wasi cspice-driver.wasi; do
+  "$OBJCOPY" --remove-section=target_features "$BUILD/$m.linked.wasm"
+  "$WASM_OPT" "$WASM_OPT_LEVEL" --mvp-features --enable-mutable-globals \
+    "$BUILD/$m.linked.wasm" -o "$OUT/$m.wasm"
 done
 
-# 4. Strict validation: every section and opcode must be Wasm 1.0 plus mutable globals.
+# 5. Strict validation: every section and opcode must be Wasm 1.0 plus mutable globals.
 node "$REPO_ROOT/scripts/check-wasm-mvp.mjs" "$OUT/cspice.wasi.wasm" "$OUT/cspice-driver.wasi.wasm"
 
 echo "Done. Artifacts in wasm/:"
