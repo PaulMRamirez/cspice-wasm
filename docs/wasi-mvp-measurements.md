@@ -14,7 +14,7 @@ measured facts; section 5 is interpretation and is labeled as such.
 
 ## 1. What was measured, and how
 
-Host: Linux 6.18 x86_64, Intel Xeon at 2.10 GHz, 2 virtual CPUs, in a cloud sandbox;
+Local host: Linux 6.18 x86_64, Intel Xeon at 2.10 GHz, 2 virtual CPUs, in a cloud sandbox;
 wall times are from that one shared machine and moved by 10 to 30 percent between runs,
 so treat them as indicative. Counts (bytes, functions, instructions, slices, system
 calls) are deterministic and were identical on every run.
@@ -41,6 +41,13 @@ flight defaults, once with limits raised), `spacewasm run` on the command driver
 host harness in `bench/spacewasm-host`, the operand stack probe, and the value check.
 The CI job `wasi` in `.github/workflows/ci.yml` runs the same steps on a GitHub runner
 and uploads the modules with `wasi-measurements.txt` and `wasi-measurements.json`.
+
+The first CI run that passed (GitHub runner, ubuntu-24.04, Intel Xeon 6975P-C, 4
+CPUs, Rust 1.100.0) rebuilt a module byte-identical to the committed one (sha256
+`0f8dd56b...1317c50`) and reproduced every count in sections 2 and 3 exactly. Its wall
+times were lower than the local ones quoted below: 0.35 ms per steady-state LT+S
+`spkezr_c`, 0.13 ms with NONE, 0.66 ms per warm `str2et_c`, 137 ms for the first
+`furnsh_c`, and 49 ms to load.
 
 The harness (`bench/spacewasm-host`, Rust) loads the reactor with the `spacewasm` crate
 directly, binds WASI 0.1 through `wasi-common` (the same crates `spacewasm run` uses),
@@ -188,6 +195,15 @@ stubs it to fail with ENOSYS. The 15 libf2c files that rely on implicit `int` ne
 `fd_renumber`, which wasi-libc's `freopen` imports and libf2c's `err.c` and `endfile.c`
 call. The harness adds that one binding (`bench/spacewasm-host/src/wasi.rs`, adapted
 from the upstream file); with it the interpreter runs the module unmodified.
+
+Node's WASI host is usable but needed a workaround. With default settings Node 22.23.5
+segfaulted in about 1 run in 10 of the smoke test (31 of 40 with `--no-liftoff`, 0 of
+40 with `--liftoff-only`, 0 of 12 with `--single-threaded`). A gdb backtrace puts the
+crash in V8's garbage collector (`IterateTurbofanOptimizedFrame`), entered from a
+memory-pressure report inside `uvwasi_fd_write`, which optimized wasm code had called.
+That is a host defect and not a property of the module, so the smoke test sets
+`--liftoff-only` for itself; after that, 60 consecutive runs passed. It was not reported
+upstream or checked against newer Node releases.
 
 Not verified: only the calls in the scenario were exercised in the WASI module. The
 other exported routines (frames, CK, SCLK, DSK, geometry finders, the SPK, CK, and DSK

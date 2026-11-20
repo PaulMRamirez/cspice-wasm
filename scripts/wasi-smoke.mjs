@@ -12,9 +12,20 @@
 // With --host-output it also checks a file of `et ...`, `state ...`, `lt ...` lines
 // printed by another host (the SpaceWasm harness in bench/spacewasm-host) the same way.
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, openSync, mkdtempSync, rmSync } from 'node:fs';
+import { devNull, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { setFlagsFromString } from 'node:v8';
 import { WASI } from 'node:wasi';
+
+// Node 22 can segfault here with its default wasm tiering: node:wasi's fd_read and
+// fd_write allocate, the allocation can report memory pressure and start a garbage
+// collection, and the collector then crashes walking the TurboFan-compiled wasm frame
+// that made the call (seen in gdb as IterateTurbofanOptimizedFrame under
+// uvwasi_fd_write). It is a host bug, intermittent (about 1 run in 10), and independent
+// of this module's contents; keeping V8 on its baseline compiler avoids it, and this
+// test measures values, not speed.
+setFlagsFromString('--liftoff-only');
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const fixtures = `${root}test/fixtures`;
@@ -22,6 +33,22 @@ const UTC = '2004-07-01T00:00:00';
 const LSK = 'naif0012.tls';
 const SPK = 'de440s-inner-cassini.bsp';
 const TOLERANCE = 1e-12;
+
+// Every WASI object gets descriptors of its own instead of the process's stdio, so
+// guest output cannot interleave with this script's report, and each object stays
+// referenced until the process exits.
+const keepAlive = [];
+function makeWasi(options, stdout = openSync(devNull, 'w')) {
+  const wasi = new WASI({
+    version: 'preview1',
+    stdin: openSync(devNull, 'r'),
+    stdout,
+    stderr: openSync(devNull, 'w'),
+    ...options,
+  });
+  keepAlive.push(wasi);
+  return wasi;
+}
 
 // The oracle: the Emscripten artifact, driven through its own glue.
 async function oracle() {
@@ -49,7 +76,7 @@ async function oracle() {
 
 // The module under test: a WASI reactor, no glue beyond the standard WASI imports.
 async function reactor() {
-  const wasi = new WASI({ version: 'preview1', preopens: { '/kernels': fixtures } });
+  const wasi = makeWasi({ preopens: { '/kernels': fixtures } });
   const bytes = readFileSync(`${root}wasm/cspice.wasi.wasm`);
   const { instance } = await WebAssembly.instantiate(bytes, wasi.getImportObject());
   wasi.initialize(instance);
@@ -88,23 +115,20 @@ async function reactor() {
 
 // The command module: run _start with stdout captured to a file, then parse it.
 async function command() {
-  const { openSync, closeSync, mkdtempSync, rmSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
   const dir = mkdtempSync(`${tmpdir()}/cspice-wasi-`);
   const outPath = `${dir}/stdout.txt`;
-  const fd = openSync(outPath, 'w');
   try {
-    const wasi = new WASI({
-      version: 'preview1',
-      args: ['cspice-driver', `/kernels/${LSK}`, `/kernels/${SPK}`],
-      preopens: { '/kernels': fixtures },
-      stdout: fd,
-      returnOnExit: true,
-    });
+    const wasi = makeWasi(
+      {
+        args: ['cspice-driver', `/kernels/${LSK}`, `/kernels/${SPK}`],
+        preopens: { '/kernels': fixtures },
+        returnOnExit: true,
+      },
+      openSync(outPath, 'w'),
+    );
     const bytes = readFileSync(`${root}wasm/cspice-driver.wasi.wasm`);
     const { instance } = await WebAssembly.instantiate(bytes, wasi.getImportObject());
     const status = wasi.start(instance);
-    closeSync(fd);
     const text = readFileSync(outPath, 'utf8');
     if (status !== 0) throw new Error(`the driver exited with status ${status}: ${text}`);
     return parseHostOutput(text);
