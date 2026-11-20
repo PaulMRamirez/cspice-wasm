@@ -2,7 +2,7 @@
 //
 // Subsets the Cassini reconstructed SCPSE SPK (fetched by kernels/fetch.sh) down
 // to the spacecraft body (-82), producing a small committed SPK under
-// kernels/fixtures so the poc-cassini e2e test renders a real trajectory without
+// test/fixtures so the poc-cassini e2e test renders a real trajectory without
 // a multi-megabyte download. Prints the spacecraft center and a sample state.
 //
 // Run: node packages/cspice-wasm/scripts/make-fixture-cassini.mjs
@@ -13,10 +13,10 @@ import { dirname, resolve } from 'node:path';
 import CSpice from '../wasm/cspice.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '../../..');
+const repoRoot = resolve(here, '..');
 const lsk = resolve(repoRoot, 'kernels/data/naif0012.tls');
 const scpse = resolve(repoRoot, 'kernels/data/cassini_scpse_04173_04236.bsp');
-const outSpk = resolve(repoRoot, 'kernels/fixtures/cassini-soi.bsp');
+const outSpk = resolve(repoRoot, 'test/fixtures/cassini-soi.bsp');
 
 const CASSINI = -82;
 // Keep the spacecraft plus Saturn (699) so footprint intercepts (sincpt) and
@@ -91,7 +91,7 @@ console.log('Coverage ET window =', JSON.stringify(cover));
 call('furnsh_c', cstr('/cassini.bsp'));
 FS.writeFile(
   '/de440s.bsp',
-  new Uint8Array(readFileSync(resolve(repoRoot, 'kernels/fixtures/de440s-inner-cassini.bsp'))),
+  new Uint8Array(readFileSync(resolve(repoRoot, 'test/fixtures/de440s-inner-cassini.bsp'))),
 );
 call('furnsh_c', cstr('/de440s.bsp'));
 

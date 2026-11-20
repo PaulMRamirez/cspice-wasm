@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createSpiceEngine, type SpiceEngine } from './index.ts';
 
 const fixture = (name: string): Uint8Array =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 
 // A demo spacecraft and a class-3 CK frame tied to it. The CK instrument id and the
 // frame id share -999000 (the frame's CLASS_ID is the CK structure id).

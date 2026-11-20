@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createSpiceEngine, type SpiceEngine } from './index.ts';
 
 const fixture = (name: string) =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 
 const CASSINI_ISS_NAC = -82360;
 const ET_UTC = '2004-07-01T02:00:00';

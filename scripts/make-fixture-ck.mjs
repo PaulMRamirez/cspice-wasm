@@ -1,7 +1,7 @@
 // One-time, reproducible generator for the demo CK attitude fixture.
 //
 // Writes a small committed CK (binary C-kernel), an SCLK, and an FK under
-// kernels/fixtures so the Cassini demo can show a real CK-driven spacecraft
+// test/fixtures so the Cassini demo can show a real CK-driven spacecraft
 // attitude (not the synthetic UniformRotation spin). The CK is a Type 3 segment
 // (discrete quaternions + linear interpolation) written by CSPICE ckw03, so the
 // bytes come from SPICE itself, never the editor (the .bc/.tsc/.tf files are
@@ -21,8 +21,8 @@ import { dirname, resolve } from 'node:path';
 import CSpice from '../wasm/cspice.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '../../..');
-const fix = (name) => resolve(repoRoot, 'kernels/fixtures', name);
+const repoRoot = resolve(here, '..');
+const fix = (name) => resolve(repoRoot, 'test/fixtures', name);
 const lsk = fix('naif0012.tls');
 
 // Cassini spacecraft body, a CK structure id, and a class-3 frame. The synthetic

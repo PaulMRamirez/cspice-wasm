@@ -5,7 +5,7 @@
 // Cassini Saturn-orbit-insertion window, and prints the spkpos reference value the
 // cspice-wasm fixture test asserts against. de440s itself is bulk data (32 MB,
 // git-ignored); this subset is a few hundred KB and is committed under
-// kernels/fixtures so the unit test is deterministic in CI without a download.
+// test/fixtures so the unit test is deterministic in CI without a download.
 //
 // Run: node packages/cspice-wasm/scripts/make-fixture-spk.mjs
 
@@ -15,10 +15,10 @@ import { dirname, resolve } from 'node:path';
 import CSpice from '../wasm/cspice.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '../../..');
+const repoRoot = resolve(here, '..');
 const lskSrc = resolve(repoRoot, 'vendor/cspice/kernels/lsk/latest_leapseconds.tls');
 const spkSrc = resolve(repoRoot, 'vendor/cspice/kernels/spk/de440s.bsp');
-const outDir = resolve(repoRoot, 'kernels/fixtures');
+const outDir = resolve(repoRoot, 'test/fixtures');
 const outSpk = resolve(outDir, 'de440s-inner-cassini.bsp');
 
 // Bodies to retain: Sun, the planet barycenters (Saturn = 6), Earth, Moon, EMB.

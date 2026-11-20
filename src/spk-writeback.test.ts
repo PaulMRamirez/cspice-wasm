@@ -11,7 +11,7 @@ import { createSpiceBindings, SpiceError, type SpiceBindings } from './index.ts'
 
 const fixture = (name: string) =>
   new Uint8Array(
-    readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))),
+    readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))),
   );
 
 const MU_EARTH = 398600.4418;

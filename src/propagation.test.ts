@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createSpiceEngine, type CartesianState, type SpiceEngine } from './index.ts';
 
 const fixture = (name: string) =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../kernels/fixtures/${name}`, import.meta.url))));
+  new Uint8Array(readFileSync(fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url))));
 
 /** Relative closeness over a 3-vector (handles solar-system magnitudes). */
 function relClose(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {

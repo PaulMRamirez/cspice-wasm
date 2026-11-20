@@ -1,8 +1,23 @@
 # cspice-wasm
 
-A typed, promise-based API over CSPICE compiled to WebAssembly. It runs the SPICE
-toolkit either in-process or in a Web Worker so the renderer and geometry layers
-can query ephemerides, frames, and geometry events off the main thread. Core layer.
+NAIF CSPICE compiled to WebAssembly, behind a typed, promise-based API. It runs the
+SPICE toolkit either in-process or in a Web Worker, so callers can query ephemerides,
+frames, and geometry events off the main thread, in browsers and in Node.
+
+This is an independent, personal open-source project. It is not a product of, and is
+not endorsed by, NAIF, NASA, JPL, or Caltech; see NOTICE for the provenance of the
+CSPICE toolkit it compiles. The package began as the spice layer of the Bessel and
+Cosmolabe projects and was extracted here with its history intact.
+
+## Install and develop
+
+The package is not yet published to npm (the name is reserved). Until the first
+release, consume it as a git dependency pinned to a commit, for example
+`"cspice-wasm": "github:PaulMRamirez/cspice-wasm#<sha>"`; the `prepare` script
+compiles `dist/` on install, and the linked `wasm/` artifacts are committed.
+
+For local work: `pnpm install`, then `pnpm verify` (typecheck, build, tests). Node 22
+or newer.
 
 ## Public API
 
@@ -17,7 +32,7 @@ Engine surface (`SpiceEngine` / `SpiceComputeEngine`):
 
 - Kernels: `furnsh`, `unload`, `kclear`, `ktotal`.
 - Time: `str2et`, `et2utc`, `utc2et`.
-- Ephemeris: `spkpos`, `spkezr`, `spkposBatch` (zero-copy n*3 positions), `spkezrBatch` (zero-copy n*6 states plus light times, the batched-states primitive under the frames tier of ADR M-0002).
+- Ephemeris: `spkpos`, `spkezr`, `spkposBatch` (zero-copy n*3 positions), `spkezrBatch` (zero-copy n*6 states plus light times, the batched-states primitive that Cosmolabe's frames tier builds on).
 - Two-body math: `oscelt`, `conics`, `prop2b`; SPK Type 13 writeback via `writeSpkType13`.
 - Geometry events: `gfoclt`, `gfdist`, `occult`.
 - Frames and bodies: `pxform`, `sxform`, `bodvrd`, `bodvcd`, `getfov`.
@@ -36,17 +51,16 @@ const et = await engine.str2et('2004-07-01T00:00:00');
 const { position, lightTime } = await engine.spkpos('6', et, 'J2000', 'NONE', '10');
 ```
 
-## Dependency rule
+## Design rules
 
-Depends on nothing in the workspace. Part of the core layer; it never imports a PAL
-implementation, UI, or shell. Kernel bytes are passed in by the caller (`furnsh(name, bytes)`),
-so the engine never reads kernel files directly. `@bessel/spice` remains as a thin facade
-re-exporting this package for bessel-heritage imports; the tier above it is
-`@cosmolabe/frames` (ADR M-0002), and nothing above that tier calls this package directly.
+The package has no runtime dependencies and never imports a UI, a platform layer, or
+a host application. Kernel bytes are passed in by the caller (`furnsh(name, bytes)`),
+so the engine never reads kernel files directly and works the same wherever the bytes
+come from. Kernels are never embedded in the build.
 
 ## Tests
 
-Tests live in `packages/cspice-wasm/src/*.test.ts` (spice, batch, dsk, geometry, geodetic,
+Tests live in `src/*.test.ts` (spice, batch, dsk, geometry, geodetic,
 occultation, propagation, eval-series, ck). The `ck.test.ts` round trip writes a known
 attitude profile to a CK Type 3 segment, furnshes it, and asserts both `ckgp` and
 `pxform(frame, J2000)` against the validated `q2m` quaternion convention. The acceptance
@@ -54,6 +68,17 @@ test (`spice.test.ts`) loads
 `naif0012.tls` plus a de440s SPK and asserts `spkpos` of Saturn barycenter (6) relative
 to the Sun (10) in J2000 at 2004-07-01 against a NAIF reference pinned from de440s,
 agreeing well within 1 metre, and checks that unresolved bodies raise a typed `SpiceError`.
+
+## Rebuilding the WASM
+
+`pnpm cspice:build` (which runs `scripts/build-cspice.sh`) needs Emscripten (`emcc`),
+`csh`, and `git`. It fetches the arturania/cspice fork at the commit pinned in the
+script, compiles about 2000 C files into a static library under `vendor/` (ignored),
+and links `wasm/cspice.mjs` plus `wasm/cspice.wasm`. To expose another SPICE routine,
+add its symbol to the `EXPORTS` list in the script, rebuild, and add the typed binding
+in `src/bindings.ts`. The bounded kernel fixtures under `test/fixtures` are committed,
+so the tests run without any download; the `scripts/make-fixture-*.mjs` generators
+that derive them need the full source kernels and are only for regenerating fixtures.
 
 ## Status / limitations
 

@@ -1,0 +1,24 @@
+cspice-wasm
+Copyright 2026 Paul M Ramirez
+
+Licensed under the Apache License, Version 2.0 (see LICENSE). That license covers
+the TypeScript wrapper, the build scripts, and the tests in this repository.
+
+Third-party material
+
+The files wasm/cspice.wasm and wasm/cspice.mjs are compiled from the CSPICE
+toolkit, which is produced by the Navigation and Ancillary Information Facility
+(NAIF) at the Jet Propulsion Laboratory, California Institute of Technology, under
+contract with NASA. The CSPICE source is obtained through the arturania/cspice
+fork (https://github.com/arturania/cspice), which adds the Emscripten build
+scripts, at the commit pinned in scripts/build-cspice.sh. CSPICE is distributed
+under NAIF's own terms, not under the Apache License; see
+https://naif.jpl.nasa.gov/naif/rules.html before redistributing.
+
+The kernel fixtures under test/fixtures are bounded subsets of, or copies of,
+public NAIF and PDS kernels (leapseconds, planetary constants, a de440s subset,
+Cassini reconstructed ephemeris and instrument kernels, and the New Horizons MU69
+low-polygon shape model), included only to make the tests deterministic.
+
+This project is independent. It is not a product of, and is not endorsed by, NAIF,
+NASA, JPL, or Caltech.
