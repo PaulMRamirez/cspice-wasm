@@ -8,3 +8,4 @@ vendor/
 # Full kernels downloaded for fixture generation; the bounded fixtures under
 # test/fixtures are committed.
 kernels/data/
+node-compile-cache/
