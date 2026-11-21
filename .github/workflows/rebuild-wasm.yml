@@ -1,0 +1,89 @@
+name: rebuild-wasm
+
+# Rebuilds the CSPICE WASM from the pinned NAIF package with Emscripten and
+# checks it three ways: against a build of the arturania/cspice fork made the way
+# this project built before it moved to the NAIF package (same compiler, so any
+# difference is a source difference), against the committed artifacts (which
+# also depends on the Emscripten version), and against the full test suite. Runs
+# on demand and whenever the build script or the patches change.
+
+on:
+  workflow_dispatch:
+    inputs:
+      emsdk:
+        description: Emscripten SDK version
+        default: latest
+  pull_request:
+    paths:
+      - scripts/build-cspice.sh
+      - patches/**
+      - .github/workflows/rebuild-wasm.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ inputs.emsdk || 'latest' }}
+      - run: sudo apt-get update && sudo apt-get install -y csh
+      - run: pnpm install --frozen-lockfile
+
+      - name: Record the committed artifacts
+        run: |
+          sha256sum wasm/cspice.wasm wasm/cspice.mjs | tee /tmp/committed.sha256
+          wc -c wasm/cspice.wasm wasm/cspice.mjs
+
+      - name: Build the previous way, from the fork, for comparison
+        run: |
+          emcc --version | head -1
+          git clone -q https://github.com/arturania/cspice.git /tmp/fork
+          git -C /tmp/fork checkout -q 53bce326267dd2d6d567de92b15869c9ed7d0629
+          ( cd /tmp/fork/src && csh ./mk_wasm.csh > /tmp/fork-build.log 2>&1 ) || { tail -40 /tmp/fork-build.log; exit 1; }
+          mkdir -p /tmp/forkout
+          sed -n '/^EXPORTS=/,/^emcc /p' scripts/build-cspice.sh | sed '$d' > /tmp/link-vars.sh
+          . /tmp/link-vars.sh
+          emcc /tmp/fork/lib/libcspice_wasm.a -o /tmp/forkout/cspice.mjs -O2 \
+            -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME=CSpice -s WASM=1 \
+            -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=167772160 -s STACK_SIZE=5242880 \
+            -s FORCE_FILESYSTEM=1 -s EXPORTED_RUNTIME_METHODS="$RUNTIME_METHODS" \
+            -s EXPORTED_FUNCTIONS="$EXPORTS"
+          sha256sum /tmp/forkout/cspice.wasm; wc -c /tmp/forkout/cspice.wasm
+
+      - name: Rebuild from the pinned NAIF package
+        run: pnpm cspice:build
+
+      - name: Compare
+        run: |
+          sha256sum wasm/cspice.wasm wasm/cspice.mjs | tee /tmp/rebuilt.sha256
+          wc -c wasm/cspice.wasm wasm/cspice.mjs
+          if cmp -s wasm/cspice.wasm /tmp/forkout/cspice.wasm; then
+            echo "SAME AS FORK BUILD: the NAIF package plus patches compiles to the same cspice.wasm, byte for byte, as the fork." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "DIFFERS FROM FORK BUILD: cspice.wasm from the NAIF package plus patches is not byte-identical to the fork build." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          if diff -q /tmp/committed.sha256 /tmp/rebuilt.sha256 >/dev/null; then
+            echo "BIT-IDENTICAL TO COMMITTED: the rebuild reproduces the committed artifacts byte for byte." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "NOT BIT-IDENTICAL TO COMMITTED: the rebuild differs from the committed artifacts (expected when the Emscripten version differs)." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run the full suite against the rebuilt artifacts
+        run: pnpm verify
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-wasm
+          path: |
+            wasm/cspice.wasm
+            wasm/cspice.mjs

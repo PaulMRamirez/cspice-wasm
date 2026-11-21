@@ -1,0 +1,32 @@
+--- a/s_copy.c
++++ b/s_copy.c
+@@ -1,3 +1,11 @@
++/*
++   MODIFIED for cspice-wasm (https://github.com/PaulMRamirez/cspice-wasm).
++   This file differs from the NAIF CSPICE N0066 Toolkit: s_copy returns int in place of void, so that its definition matches the declaration in f2c.h, which WebAssembly requires.
++   The change is applied by the cspice-wasm project (it originated in the
++   arturania/cspice fork), not by NAIF, and modified
++   code is not supported by NAIF. Obtain the SPICE Toolkit from
++   https://naif.jpl.nasa.gov/naif/toolkit.html.
++*/
+ /* Unless compiled with -DNO_OVERWRITE, this variant of s_copy allows the
+  * target of an assignment to appear on its right-hand side (contrary
+  * to the Fortran 77 Standard, but in accordance with Fortran 90),
+@@ -9,9 +17,9 @@
+ /* assign strings:  a = b */
+ 
+ #ifdef KR_headers
+-VOID s_copy(a, b, la, lb) register char *a, *b; ftnlen la, lb;
++int s_copy(a, b, la, lb) register char *a, *b; ftnlen la, lb;
+ #else
+-void s_copy(register char *a, register char *b, ftnlen la, ftnlen lb)
++int s_copy(register char *a, register char *b, ftnlen la, ftnlen lb)
+ #endif
+ {
+ 	register char *aend, *bend;
+@@ -48,4 +56,5 @@
+ 		while(a < aend)
+ 			*a++ = ' ';
+ 		}
++		return 0;
+ 	}

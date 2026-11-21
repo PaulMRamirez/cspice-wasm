@@ -1,0 +1,29 @@
+--- a/s_cat.c
++++ b/s_cat.c
+@@ -1,3 +1,11 @@
++/*
++   MODIFIED for cspice-wasm (https://github.com/PaulMRamirez/cspice-wasm).
++   This file differs from the NAIF CSPICE N0066 Toolkit: s_cat returns int in place of void, so that its definition matches the declaration in f2c.h, which WebAssembly requires.
++   The change is applied by the cspice-wasm project (it originated in the
++   arturania/cspice fork), not by NAIF, and modified
++   code is not supported by NAIF. Obtain the SPICE Toolkit from
++   https://naif.jpl.nasa.gov/naif/toolkit.html.
++*/
+ /* Unless compiled with -DNO_OVERWRITE, this variant of s_cat allows the
+  * target of a concatenation to appear on its right-hand side (contrary
+  * to the Fortran 77 Standard, but in accordance with Fortran 90).
+@@ -20,7 +28,7 @@
+ #include "string.h"
+ #endif /* NO_OVERWRITE */
+ 
+- VOID
++int
+ #ifdef KR_headers
+ s_cat(lp, rpp, rnp, np, ll) char *lp, *rpp[]; ftnlen rnp[], *np, ll;
+ #else
+@@ -72,4 +80,5 @@
+ 		free(lp1);
+ 		}
+ #endif
++		return 0;
+ 	}
