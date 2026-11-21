@@ -10,8 +10,19 @@
 # Emscripten FS.
 #
 # Usage: bash scripts/build-cspice.sh   (or: pnpm cspice:build)
-# Requires: emscripten (emcc, emar), curl, gzip, tar, patch on PATH.
+# Requires: emscripten (emcc, emar) at exactly EMSDK_VERSION below, plus curl,
+# gzip, tar, patch on PATH.
 # CSPICE_FETCH_ONLY=1 stops after the source is fetched, verified, and patched.
+# --emsdk-version prints the pinned Emscripten version and exits; the workflows
+# read it this way, so the pin lives in this file and nowhere else.
+#
+# The committed artifacts are a promise: wasm/cspice.wasm and wasm/cspice.mjs are
+# byte for byte what this script produces with the pinned Emscripten, and the
+# rebuild-wasm workflow fails when they are not. The script therefore refuses to
+# build with any other emcc. To try another version on purpose (the first step
+# of a deliberate bump), set CSPICE_ALLOW_EMSDK_MISMATCH=1; the artifacts that
+# come out are then not the committed ones and must not be committed unless
+# EMSDK_VERSION is changed in the same commit.
 #
 # The package is NAIF's Mac, Intel, 64 bit build of N0066. Its C source is the
 # same across NAIF's platform packages apart from a few platform identifiers; the
@@ -20,6 +31,20 @@
 # docs/cspice-source-provenance.md.
 
 set -euo pipefail
+
+# The one place the Emscripten version is recorded. Bump it deliberately, and
+# commit the rebuilt artifacts with the bump (see README.md, Rebuilding the WASM).
+EMSDK_VERSION="7.0.0"
+
+if [ "${1:-}" = "--emsdk-version" ]; then
+  echo "$EMSDK_VERSION"
+  exit 0
+fi
+
+# File name expansion order decides the member order of the static library, and
+# through it the layout of the linked module; fix the collation so every host
+# expands *.c the same way.
+export LC_ALL=C
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VENDOR="$REPO_ROOT/vendor/naif-n0066"
@@ -65,7 +90,23 @@ if [ "${CSPICE_FETCH_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
+command -v emcc >/dev/null 2>&1 || { echo "emcc not found on PATH; install Emscripten $EMSDK_VERSION (emsdk install $EMSDK_VERSION && emsdk activate $EMSDK_VERSION)." >&2; exit 1; }
+have="$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-git)?' | head -1 || true)"
+if [ "$have" != "$EMSDK_VERSION" ]; then
+  if [ "${CSPICE_ALLOW_EMSDK_MISMATCH:-0}" = "1" ]; then
+    echo "WARNING: building with Emscripten ${have:-unknown}, not the pinned $EMSDK_VERSION (CSPICE_ALLOW_EMSDK_MISMATCH=1). The artifacts will not match the committed ones." >&2
+  else
+    echo "Emscripten version mismatch: this build is pinned to $EMSDK_VERSION, but emcc on PATH reports ${have:-unknown}." >&2
+    echo "Install the pinned version (emsdk install $EMSDK_VERSION && emsdk activate $EMSDK_VERSION), or set CSPICE_ALLOW_EMSDK_MISMATCH=1 to build anyway for a deliberate version trial." >&2
+    exit 1
+  fi
+fi
+
+# The static library is specific to the compiler that made it, so it is rebuilt
+# when it was compiled by a different Emscripten version.
 LIB="$VENDOR/libcspice_wasm.a"
+LIB_STAMP="$VENDOR/.emsdk-version"
+if [ -f "$LIB" ] && [ "$(cat "$LIB_STAMP" 2>/dev/null)" != "$have" ]; then rm -f "$LIB"; fi
 if [ ! -f "$LIB" ]; then
   echo "Building libcspice_wasm.a (this compiles about 2000 C files) ..."
   (
@@ -76,6 +117,7 @@ if [ ! -f "$LIB" ]; then
     emar rcs "$LIB" *.o
     rm -f *.o
   )
+  echo "$have" > "$LIB_STAMP"
 fi
 
 # The exported SPICE surface lives in scripts/cspice-exports.txt, shared with the WASI
@@ -103,6 +145,8 @@ emcc "$LIB" -o "$OUT/cspice.mjs" \
 # Mark the generated glue as not lintable; it is a build artifact.
 sed -i.bak '1s;^;/* eslint-disable */\n// @ts-nocheck\n;' "$OUT/cspice.mjs"
 rm -f "$OUT/cspice.mjs.bak"
+# emcc marks the module executable; the committed file is a plain data file.
+chmod 644 "$OUT/cspice.wasm" "$OUT/cspice.mjs"
 
 echo "Done. Artifacts in wasm/:"
 ls -la "$OUT"

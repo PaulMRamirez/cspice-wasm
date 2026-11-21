@@ -11,6 +11,9 @@ The WebAssembly artifacts in `wasm/` are compiled from the CSPICE Toolkit, versi
 | Package | `https://naif.jpl.nasa.gov/pub/naif/misc/toolkit_N0066/C/MacIntel_OSX_AppleC_64bit/packages/cspice.tar.Z` |
 | SHA-256 | `f5d48c4b0d558c5d71e8bf6fcdf135b0943210c1ff91f8191dfc447419a6b12e` |
 | Toolkit version | N0066 |
+| Compiler | Emscripten 7.0.0 (`EMSDK_VERSION` in `scripts/build-cspice.sh`) |
+
+The committed `wasm/cspice.wasm` and `wasm/cspice.mjs` are the output of that script with that compiler. The `rebuild-wasm` workflow repeats the build on a GitHub Actions runner and fails unless it reproduces the committed files byte for byte; the WASI module `wasm/cspice.wasi.wasm` is held to the same standard by the `wasi` job in `ci`. The artifacts committed before the compiler was pinned came from the fork described below and an Emscripten version that was not recorded, so they could not be reproduced; they were replaced by a build made in CI with the pinned version (the `commit-wasm-artifacts` workflow, which commits as `github-actions[bot]`).
 
 NAIF's platform packages share their C source apart from a few platform identifiers (`SpiceZpl.h`, `zzplatfm.c`, and the logical unit count in `fndlun.c`). The Mac package is used because the artifacts were first built from it, so this build reports NAIF's Mac platform identifiers. Moving to another platform package is a deliberate change that needs a rebuild and the test suite.
 
@@ -29,7 +32,7 @@ These changes originated in the arturania/cspice GitHub fork, which this project
 
 ## History: the fork
 
-Until this change the build fetched the arturania/cspice fork at commit `53bce326267dd2d6d567de92b15869c9ed7d0629`. A file by file comparison with NAIF's N0066 Mac package found 2,179 files identical, six changed, and one added: the four changes above, `extern` added to the prototypes in `SpiceZpr.h` (for a Windows DLL build), a comment block added to `writln.c`, and an added `erf.c`. None was labeled as modified. The three that WebAssembly does not need are no longer part of the build. The `rebuild-wasm` workflow builds both ways with the same compiler and reports whether the results are byte-identical.
+Until it moved to NAIF's package the build fetched the arturania/cspice fork at commit `53bce326267dd2d6d567de92b15869c9ed7d0629`. A file by file comparison with NAIF's N0066 Mac package found 2,179 files identical, six changed, and one added: the four changes above, `extern` added to the prototypes in `SpiceZpr.h` (for a Windows DLL build), a comment block added to `writln.c`, and an added `erf.c`. None was labeled as modified. The three that WebAssembly does not need are no longer part of the build. The `rebuild-wasm` workflow still builds both ways with the same compiler and reports whether the results are byte-identical; with Emscripten 7.0.0 they are.
 
 ## Getting the Toolkit
 

@@ -1,0 +1,107 @@
+name: commit-wasm-artifacts
+
+# Maintenance tool, guarded. Rebuilds wasm/cspice.wasm and wasm/cspice.mjs with
+# the Emscripten version pinned in scripts/build-cspice.sh, runs the full test
+# suite against them, and commits those two files (and nothing else) back to the
+# branch that asked for it. It exists so the committed artifacts are exactly
+# what the pinned build produces on the CI runner, which is the same machine
+# image the rebuild-wasm check uses to hold them to it.
+#
+# It acts only when asked: a push to a branch other than main whose head commit
+# message contains the marker [commit-wasm-artifacts], or a manual run on a
+# branch other than main. It never runs for pull requests from forks (it has no
+# pull_request trigger), never touches main, and cannot loop: the commit it
+# makes carries no marker, and pushes made with the workflow token do not start
+# workflows. For that same reason the commit it adds gets no CI of its own;
+# push a follow-up commit (or run the checks by hand) to have ci and
+# rebuild-wasm judge the branch with the new artifacts in it.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commit-wasm-artifacts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rebuild-and-commit:
+    if: >-
+      github.ref_type == 'branch' && github.ref != 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(github.event.head_commit.message, '[commit-wasm-artifacts]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Read the pinned Emscripten version
+        id: pin
+        run: echo "version=$(bash scripts/build-cspice.sh --emsdk-version)" >> "$GITHUB_OUTPUT"
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ steps.pin.outputs.version }}
+      - run: pnpm install --frozen-lockfile
+
+      - name: Rebuild from the pinned NAIF package with the pinned Emscripten
+        run: |
+          emcc --version | head -1
+          pnpm cspice:build
+
+      - name: Run the full suite against the rebuilt artifacts
+        run: pnpm verify
+
+      - name: Commit the two artifacts if they changed
+        env:
+          EMSDK_VERSION: ${{ steps.pin.outputs.version }}
+        run: |
+          set -euo pipefail
+          other="$(git status --porcelain | grep -vE '^ M wasm/cspice\.(wasm|mjs)$' || true)"
+          if [ -n "$other" ]; then
+            echo "::error::the build changed files other than the two artifacts; refusing to commit"
+            echo "$other"
+            exit 1
+          fi
+          if git diff --quiet -- wasm/cspice.wasm wasm/cspice.mjs; then
+            echo "The committed artifacts are already what the pinned build produces; nothing to commit." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          sums="$(sha256sum wasm/cspice.wasm wasm/cspice.mjs)"
+          sizes="$(wc -c wasm/cspice.wasm wasm/cspice.mjs | head -2)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wasm/cspice.wasm wasm/cspice.mjs
+          {
+            echo "build(wasm): rebuild the Emscripten artifacts with Emscripten $EMSDK_VERSION"
+            echo
+            echo "Built by the commit-wasm-artifacts workflow (run $GITHUB_RUN_ID) from $GITHUB_SHA"
+            echo "with scripts/build-cspice.sh: NAIF's N0066 package, the four labeled patches,"
+            echo "Emscripten $EMSDK_VERSION. The full test suite passed against these files before"
+            echo "they were committed."
+            echo
+            echo "SHA-256:"
+            echo "$sums"
+            echo
+            echo "Bytes:"
+            echo "$sizes"
+          } > /tmp/commit-message.txt
+          git commit -q -F /tmp/commit-message.txt
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          {
+            echo "Committed the rebuilt artifacts to ${GITHUB_REF_NAME} as $(git rev-parse HEAD)."
+            echo
+            echo '```'
+            echo "$sums"
+            echo "$sizes"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

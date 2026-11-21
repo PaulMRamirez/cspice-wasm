@@ -75,11 +75,36 @@ agreeing well within 1 metre, and checks that unresolved bodies raise a typed `S
 
 ## Rebuilding the WASM
 
-`pnpm cspice:build` (which runs `scripts/build-cspice.sh`) needs Emscripten (`emcc`),
-`curl`, `gzip`, `tar`, and `patch`. It downloads NAIF's N0066 CSPICE package from the
-NAIF server, verifies its SHA-256, applies the four labeled patches in `patches/`,
-compiles about 2000 C files into a static library under `vendor/` (ignored), and links
-`wasm/cspice.mjs` plus `wasm/cspice.wasm`. To expose another SPICE routine, add its
+`pnpm cspice:build` (which runs `scripts/build-cspice.sh`) needs Emscripten (`emcc`)
+at exactly the version the script pins, plus `curl`, `gzip`, `tar`, and `patch`. It
+downloads NAIF's N0066 CSPICE package from the NAIF server, verifies its SHA-256,
+applies the four labeled patches in `patches/`, compiles about 2000 C files into a
+static library under `vendor/` (ignored), and links `wasm/cspice.mjs` plus
+`wasm/cspice.wasm`.
+
+The committed `wasm/cspice.wasm` and `wasm/cspice.mjs` are that build's output, byte
+for byte, with Emscripten 7.0.0. The version is recorded in one place, `EMSDK_VERSION`
+in `scripts/build-cspice.sh` (`bash scripts/build-cspice.sh --emsdk-version` prints
+it, and the workflows install whatever it prints). The script stops with an error when
+`emcc` on the path is any other version; `CSPICE_ALLOW_EMSDK_MISMATCH=1` overrides
+that for a deliberate trial, whose output is not the committed artifacts. The
+`rebuild-wasm` workflow rebuilds on a GitHub Actions Linux runner and fails unless the
+result is byte-identical to the committed files, so a change to the build script, the
+export list, the patches, or the artifacts cannot merge with the two out of step.
+Other hosts running the same Emscripten release are expected to produce the same
+bytes, but only the CI runner is checked.
+
+To move to another Emscripten version, change `EMSDK_VERSION` on a branch and push a
+commit whose message contains `[commit-wasm-artifacts]`. The `commit-wasm-artifacts`
+workflow then rebuilds with the new pin, runs the test suite against the result, and
+commits the two rebuilt files (nothing else) to that branch as `github-actions[bot]`.
+It never acts on `main` and never without that marker or a manual run. Its commit
+does not start CI (pushes made with the workflow token never do), so push one more
+commit, or run the checks by hand, before trusting the branch. Rebuilding locally
+with the pinned version and committing the result is equivalent, as long as
+`rebuild-wasm` then agrees.
+
+To expose another SPICE routine, add its
 symbol to `scripts/cspice-exports.txt` (shared by both build targets), rebuild, and add
 the typed binding in `src/bindings.ts`. The bounded kernel fixtures under `test/fixtures` are committed,
 so the tests run without any download; the `scripts/make-fixture-*.mjs` generators
