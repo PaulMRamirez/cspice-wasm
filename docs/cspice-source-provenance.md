@@ -39,4 +39,4 @@ To obtain the SPICE Toolkit, its documentation, and SPICE kernels, go to NAIF: h
 
 ## A cleaner arrangement, not yet done
 
-The build could fetch N0066 directly from the NAIF server and apply this project's own small patch set for the five files WebAssembly needs, with each patched file labeled as modified. That would remove the dependency on a third-party fork and make the labeling explicit. It changes the build inputs, so it needs a rebuild and the full test suite before it replaces the current arrangement.
+The build could fetch N0066 directly from the NAIF server and apply this project's own small patch set for the few files WebAssembly needs (the three return type changes and the `fio.h` include), with each patched file labeled as modified. That would remove the dependency on a third-party fork and make the labeling explicit. It changes the build inputs, so it needs a rebuild and the full test suite before it replaces the current arrangement.
