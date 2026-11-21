@@ -13,7 +13,9 @@ import type {
   LocalSolarTime,
   Mat3,
   OsculatingElements,
+  PoolVariableInfo,
   PositionResult,
+  SclkPartitions,
   StateBatchArrays,
   StateVector,
   SubPointResult,
@@ -196,6 +198,18 @@ export type SpiceWorkerRequest =
     }
   | { id: number; method: 'sce2c'; sc: number; et: number }
   | { id: number; method: 'sct2e'; sc: number; sclkdp: number }
+  | { id: number; method: 'scdecd'; sc: number; sclkdp: number }
+  | { id: number; method: 'scencd'; sc: number; sclkch: string }
+  | { id: number; method: 'scs2e'; sc: number; sclkch: string }
+  | { id: number; method: 'sce2s'; sc: number; et: number }
+  | { id: number; method: 'sctiks'; sc: number; clkstr: string }
+  | { id: number; method: 'scfmt'; sc: number; ticks: number }
+  | { id: number; method: 'scpart'; sc: number }
+  | { id: number; method: 'dtpool'; name: string }
+  | { id: number; method: 'gdpool'; name: string; start?: number; room?: number }
+  | { id: number; method: 'gipool'; name: string; start?: number; room?: number }
+  | { id: number; method: 'gcpool'; name: string; start?: number; room?: number }
+  | { id: number; method: 'unitim'; epoch: number; insys: string; outsys: string }
   | { id: number; method: 'ckgp'; inst: number; sclkdp: number; tol: number; ref: string }
   | {
       id: number;
@@ -252,6 +266,18 @@ export type SpiceWorkerResultMap = {
   writeSpkType13: void;
   sce2c: number;
   sct2e: number;
+  scdecd: string;
+  scencd: number;
+  scs2e: number;
+  sce2s: string;
+  sctiks: number;
+  scfmt: string;
+  scpart: SclkPartitions;
+  dtpool: PoolVariableInfo;
+  gdpool: number[] | null;
+  gipool: number[] | null;
+  gcpool: string[] | null;
+  unitim: number;
   ckgp: CkPointing;
   writeCk03: void;
   twovec: Mat3;

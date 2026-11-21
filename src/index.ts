@@ -271,6 +271,38 @@ export interface SpiceEngine {
   sce2c(sc: number, et: number): Promise<number>;
   /** Continuous encoded SCLK ticks to ephemeris seconds past J2000 (ET) (sct2e). */
   sct2e(sc: number, sclkdp: number): Promise<number>;
+  /** Format encoded SCLK ticks as a clock string with its partition number (scdecd). */
+  scdecd(sc: number, sclkdp: number): Promise<string>;
+  /** Encode a clock string, with or without a partition number, as ticks (scencd). */
+  scencd(sc: number, sclkch: string): Promise<number>;
+  /** Clock string to ET, seconds past J2000 TDB (scs2e). */
+  scs2e(sc: number, sclkch: string): Promise<number>;
+  /** ET, seconds past J2000 TDB, to a clock string with its partition number (sce2s). */
+  sce2s(sc: number, et: number): Promise<string>;
+  /** Clock string without a partition number to a tick count (sctiks). */
+  sctiks(sc: number, clkstr: string): Promise<number>;
+  /** Tick count to a clock string without a partition number (scfmt). */
+  scfmt(sc: number, ticks: number): Promise<string>;
+  /** Partition start and stop ticks of a spacecraft clock, in partition order (scpart). */
+  scpart(sc: number): Promise<SclkPartitions>;
+  /** Existence, size, and type of a kernel pool variable (dtpool). */
+  dtpool(name: string): Promise<PoolVariableInfo>;
+  /**
+   * Double precision values of a kernel pool variable (gdpool), from the zero-based
+   * index `start`, at most `room` of them (default: all that remain). Null when the
+   * variable is not in the pool or holds character values.
+   */
+  gdpool(name: string, start?: number, room?: number): Promise<number[] | null>;
+  /**
+   * Integer values of a kernel pool variable (gipool), each rounded to the nearest
+   * integer; rejects with a SpiceError when a value does not fit 32 bits. Null as for
+   * gdpool.
+   */
+  gipool(name: string, start?: number, room?: number): Promise<number[] | null>;
+  /** Character values of a kernel pool variable (gcpool). Null when it is absent or numeric. */
+  gcpool(name: string, start?: number, room?: number): Promise<string[] | null>;
+  /** Convert an epoch between uniform time systems, for example TDB to TDT or TAI (unitim). */
+  unitim(epoch: number, insys: string, outsys: string): Promise<number>;
   /**
    * CK pointing query (ckgp): C-matrix (frame -> base) for `inst` at encoded SCLK
    * `sclkdp` within `tol` ticks, in reference frame `ref`. `found` is false (not an
@@ -396,6 +428,24 @@ export interface CkPointing {
   readonly cmat: Mat3;
   /** The encoded SCLK tick value of the returned pointing. */
   readonly clkout: number;
+}
+
+/** Partition boundaries from scpart: tick values, one entry per partition, in order. */
+export interface SclkPartitions {
+  /** The tick value at which each partition starts. */
+  readonly pstart: number[];
+  /** The tick value at which each partition stops. */
+  readonly pstop: number[];
+}
+
+/** Kernel pool variable description from dtpool. */
+export interface PoolVariableInfo {
+  /** Whether the variable is in the pool. */
+  readonly found: boolean;
+  /** The number of values it holds; 0 when not found. */
+  readonly n: number;
+  /** 'N' for numeric values, 'C' for character values, 'X' when not found. */
+  readonly type: 'C' | 'N' | 'X';
 }
 
 /** Located, typed SPICE error. Fail loudly (CLAUDE.md). */

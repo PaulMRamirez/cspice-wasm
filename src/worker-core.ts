@@ -184,6 +184,30 @@ export async function dispatchSpice(engine: SpiceEngine, req: SpiceWorkerRequest
       return engine.sce2c(req.sc, req.et);
     case 'sct2e':
       return engine.sct2e(req.sc, req.sclkdp);
+    case 'scdecd':
+      return engine.scdecd(req.sc, req.sclkdp);
+    case 'scencd':
+      return engine.scencd(req.sc, req.sclkch);
+    case 'scs2e':
+      return engine.scs2e(req.sc, req.sclkch);
+    case 'sce2s':
+      return engine.sce2s(req.sc, req.et);
+    case 'sctiks':
+      return engine.sctiks(req.sc, req.clkstr);
+    case 'scfmt':
+      return engine.scfmt(req.sc, req.ticks);
+    case 'scpart':
+      return engine.scpart(req.sc);
+    case 'dtpool':
+      return engine.dtpool(req.name);
+    case 'gdpool':
+      return engine.gdpool(req.name, req.start, req.room);
+    case 'gipool':
+      return engine.gipool(req.name, req.start, req.room);
+    case 'gcpool':
+      return engine.gcpool(req.name, req.start, req.room);
+    case 'unitim':
+      return engine.unitim(req.epoch, req.insys, req.outsys);
     case 'ckgp':
       return engine.ckgp(req.inst, req.sclkdp, req.tol, req.ref);
     case 'writeCk03':

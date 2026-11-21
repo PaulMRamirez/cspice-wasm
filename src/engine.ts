@@ -127,6 +127,42 @@ export function spiceEngineOver(bindings: SpiceBindings): SpiceEngine {
     async sct2e(sc, sclkdp) {
       return bindings.sct2e(sc, sclkdp);
     },
+    async scdecd(sc, sclkdp) {
+      return bindings.scdecd(sc, sclkdp);
+    },
+    async scencd(sc, sclkch) {
+      return bindings.scencd(sc, sclkch);
+    },
+    async scs2e(sc, sclkch) {
+      return bindings.scs2e(sc, sclkch);
+    },
+    async sce2s(sc, et) {
+      return bindings.sce2s(sc, et);
+    },
+    async sctiks(sc, clkstr) {
+      return bindings.sctiks(sc, clkstr);
+    },
+    async scfmt(sc, ticks) {
+      return bindings.scfmt(sc, ticks);
+    },
+    async scpart(sc) {
+      return bindings.scpart(sc);
+    },
+    async dtpool(name) {
+      return bindings.dtpool(name);
+    },
+    async gdpool(name, start, room) {
+      return bindings.gdpool(name, start, room);
+    },
+    async gipool(name, start, room) {
+      return bindings.gipool(name, start, room);
+    },
+    async gcpool(name, start, room) {
+      return bindings.gcpool(name, start, room);
+    },
+    async unitim(epoch, insys, outsys) {
+      return bindings.unitim(epoch, insys, outsys);
+    },
     async ckgp(inst, sclkdp, tol, ref) {
       return bindings.ckgp(inst, sclkdp, tol, ref);
     },
