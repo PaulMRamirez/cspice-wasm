@@ -15,6 +15,13 @@ scripts, at the commit pinned in scripts/build-cspice.sh. CSPICE is distributed
 under NAIF's own terms, not under the Apache License; see
 https://naif.jpl.nasa.gov/naif/rules.html before redistributing.
 
+The fork is NAIF's N0066 package with six files changed and one added by the
+fork's author (function return types and an include needed for WebAssembly, and
+declaration changes for a Windows build); this project makes no change to the
+CSPICE source. docs/cspice-source-provenance.md lists every difference. Such
+modified code is not supported by NAIF. To obtain the SPICE Toolkit itself, its
+documentation, and kernels, go to https://naif.jpl.nasa.gov/naif/toolkit.html.
+
 The kernel fixtures under test/fixtures are bounded subsets of, or copies of,
 public NAIF and PDS kernels (leapseconds, planetary constants, a de440s subset,
 Cassini reconstructed ephemeris and instrument kernels, and the New Horizons MU69

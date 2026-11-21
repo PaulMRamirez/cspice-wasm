@@ -9,6 +9,10 @@ not endorsed by, NAIF, NASA, JPL, or Caltech; see NOTICE for the provenance of t
 CSPICE toolkit it compiles. The package began as the spice layer of the Bessel and
 Cosmolabe projects and was extracted here with its history intact.
 
+To obtain the SPICE Toolkit itself, its documentation, and kernels, go to NAIF at
+https://naif.jpl.nasa.gov/naif/toolkit.html. What this package compiles, and how that
+source differs from NAIF's release, is recorded in docs/cspice-source-provenance.md.
+
 ## Install and develop
 
 The package is not yet published to npm (the name is reserved). Until the first
