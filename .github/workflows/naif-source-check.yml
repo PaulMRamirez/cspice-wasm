@@ -1,0 +1,65 @@
+name: naif-source-check
+
+# Compares the CSPICE source this project compiles (the arturania/cspice fork at
+# the commit pinned in scripts/build-cspice.sh) with the N0066 Toolkit as NAIF
+# distributes it, file by file, ignoring line endings. The result is the factual
+# basis for docs/cspice-source-provenance.md. It reports and does not fail on
+# differences; it fails only if it cannot fetch or compare.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/naif-source-check.yml
+      - scripts/build-cspice.sh
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the pinned fork
+        run: |
+          PIN=$(grep -o 'CSPICE_COMMIT:-[0-9a-f]*' scripts/build-cspice.sh | cut -d- -f2)
+          echo "pin: $PIN"
+          mkdir fork && cd fork && git init -q
+          git fetch -q --depth 1 https://github.com/arturania/cspice.git "$PIN"
+          git checkout -q FETCH_HEAD
+      - name: Fetch the N0066 Toolkit from NAIF (Linux and Mac packages)
+        run: |
+          set -e
+          BASE=https://naif.jpl.nasa.gov/pub/naif/misc/toolkit_N0066/C
+          for pkg in PC_Linux_GCC_64bit MacIntel_OSX_AppleC_64bit; do
+            mkdir "$pkg"
+            curl -fsSL -o "$pkg/cspice.tar.Z" "$BASE/$pkg/packages/cspice.tar.Z"
+            sha256sum "$pkg/cspice.tar.Z"
+            gzip -dc "$pkg/cspice.tar.Z" | tar xf - -C "$pkg"
+          done
+      - name: Compare
+        run: |
+          set +e
+          shopt -s nullglob
+          norm() { tr -d '\r' < "$1" | sed 's/[ \t]*$//'; }
+          for pkg in PC_Linux_GCC_64bit MacIntel_OSX_AppleC_64bit; do
+            naif=$pkg/cspice
+            same=0; : > differing.txt; : > forkonly.txt
+            for f in fork/src/*.c fork/src/*.h fork/include/*.h; do
+              b=$(basename "$f"); n=""
+              for cand in $naif/src/cspice/$b $naif/include/$b; do [ -f "$cand" ] && n=$cand && break; done
+              if [ -z "$n" ]; then echo "$b" >> forkonly.txt; continue; fi
+              if [ "$(norm "$f" | sha256sum)" = "$(norm "$n" | sha256sum)" ]; then same=$((same+1)); else echo "$b" >> differing.txt; fi
+            done
+            echo "RESULT $pkg identical=$same differing=$(sort -u differing.txt | wc -l) fork_only=$(sort -u forkonly.txt | wc -l)"
+            echo "DIFFERING $pkg: $(sort -u differing.txt | tr '\n' ' ')"
+            echo "FORK_ONLY $pkg: $(sort -u forkonly.txt | tr '\n' ' ')"
+            for b in $(sort -u differing.txt); do
+              f=$(ls fork/src/$b fork/include/$b 2>/dev/null | head -1)
+              n=$(ls $naif/src/cspice/$b $naif/include/$b 2>/dev/null | head -1)
+              echo "=== $pkg $b: $(diff <(norm "$n") <(norm "$f") | grep -c '^[<>]') changed lines"
+            done
+          done
+          exit 0
