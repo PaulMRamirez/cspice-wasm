@@ -1,0 +1,65 @@
+name: naif-source-check
+
+# Compares the CSPICE source this project compiles (the arturania/cspice fork at
+# the commit pinned in scripts/build-cspice.sh) with the N0066 Toolkit as NAIF
+# distributes it, file by file, ignoring line endings. The result is the factual
+# basis for docs/cspice-source-provenance.md. It reports and does not fail on
+# differences; it fails only if it cannot fetch or compare.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/naif-source-check.yml
+      - scripts/build-cspice.sh
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the pinned fork
+        run: |
+          PIN=$(grep -o 'CSPICE_COMMIT:-[0-9a-f]*' scripts/build-cspice.sh | cut -d- -f2)
+          echo "pin: $PIN"
+          mkdir fork && cd fork && git init -q
+          git fetch -q --depth 1 https://github.com/arturania/cspice.git "$PIN"
+          git checkout -q FETCH_HEAD
+      - name: Fetch the N0066 Toolkit from NAIF
+        run: |
+          set -e
+          URL=https://naif.jpl.nasa.gov/pub/naif/misc/toolkit_N0066/C/PC_Linux_GCC_64bit/packages/cspice.tar.Z
+          curl -fsSL -o cspice.tar.Z "$URL"
+          sha256sum cspice.tar.Z
+          gzip -dc cspice.tar.Z | tar xf -
+          ls cspice
+      - name: Compare
+        run: |
+          set +e
+          norm() { tr -d '\r' < "$1" | sed 's/[ \t]*$//'; }
+          same=0; diff=0; forkonly=0
+          : > differing.txt; : > forkonly.txt
+          for f in fork/src/*.c fork/src/*.h fork/include/*.h; do
+            b=$(basename "$f")
+            n=""
+            for cand in cspice/src/cspice/$b cspice/include/$b; do [ -f "$cand" ] && n=$cand && break; done
+            if [ -z "$n" ]; then echo "$b" >> forkonly.txt; forkonly=$((forkonly+1)); continue; fi
+            if [ "$(norm "$f" | sha256sum)" = "$(norm "$n" | sha256sum)" ]; then same=$((same+1)); else echo "$b" >> differing.txt; diff=$((diff+1)); fi
+          done
+          ls cspice/src/cspice | while read b; do [ -f fork/src/$b ] || [ -f fork/include/$b ] || echo "$b"; done > naifonly.txt
+          echo "RESULT identical=$same differing=$diff fork_only=$forkonly naif_only=$(wc -l < naifonly.txt)"
+          echo "DIFFERING: $(sort -u differing.txt | tr '\n' ' ')"
+          echo "FORK_ONLY: $(sort -u forkonly.txt | tr '\n' ' ')"
+          echo "NAIF_ONLY: $(tr '\n' ' ' < naifonly.txt)"
+          for b in $(sort -u differing.txt); do
+            f=$(ls fork/src/$b fork/include/$b 2>/dev/null | head -1)
+            n=$(ls cspice/src/cspice/$b cspice/include/$b 2>/dev/null | head -1)
+            echo "=== $b: $(diff <(norm "$n") <(norm "$f") | grep -c '^[<>]') changed lines"
+            diff <(norm "$n") <(norm "$f") | head -30
+          done
+          grep -n 'CSPICE_N00' cspice/src/cspice/tkvrsn_c.c | tail -2
+          exit 0
