@@ -21,8 +21,10 @@ calls) are deterministic and were identical on every run.
 
 Toolchain: Ubuntu clang 18.1.3 and wasm-ld 18, binaryen 108 (`apt` packages `clang`,
 `lld`, `llvm`, `binaryen`, `libclang-rt-18-dev-wasm32`); wasi-libc at commit `574b88da` (the `wasi-sdk-25` tag),
-built by the script at `-mcpu=mvp` with `BULK_MEMORY_SOURCES=` emptied; CSPICE from
-arturania/cspice at `53bce326`, compiled at `-O2`, then the linked module optimized
+built by the script at `-mcpu=mvp` with `BULK_MEMORY_SOURCES=` emptied; CSPICE N0066 from
+NAIF's own package with the four labeled patches in `patches/` (the measurements were
+first taken on a build of the arturania/cspice fork at `53bce326`; the module built from
+the NAIF package is byte-identical to it, as CI's reproducibility check confirms), compiled at `-O2`, then the linked module optimized
 with `wasm-opt -O2 --mvp-features --enable-mutable-globals`; Node 22.23.5; Rust 1.97.0; `spacewasm`,
 `spacewasm_tools` 0.8.0-rc.3 from crates.io with `wasi-common` and `wiggle` 28.0.1.
 
