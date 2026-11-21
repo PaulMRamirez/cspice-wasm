@@ -1,0 +1,25 @@
+--- a/fio.h
++++ b/fio.h
+@@ -1,3 +1,11 @@
++/*
++   MODIFIED for cspice-wasm (https://github.com/PaulMRamirez/cspice-wasm).
++   This file differs from the NAIF CSPICE N0066 Toolkit: unistd.h is included when compiling with Emscripten, for the POSIX I/O declarations the f2c runtime uses.
++   The change is applied by the cspice-wasm project (it originated in the
++   arturania/cspice fork), not by NAIF, and modified
++   code is not supported by NAIF. Obtain the SPICE Toolkit from
++   https://naif.jpl.nasa.gov/naif/toolkit.html.
++*/
+ #include "stdio.h"
+ #include "errno.h"
+ #ifndef NULL
+@@ -5,6 +13,10 @@
+ #include "stddef.h"
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++#include <unistd.h>
++#endif
++
+ #ifndef SEEK_SET
+ #define SEEK_SET 0
+ #define SEEK_CUR 1

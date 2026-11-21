@@ -1,0 +1,36 @@
+# CSPICE source provenance
+
+The WebAssembly artifacts in `wasm/` are compiled from the CSPICE Toolkit, version N0066, produced by NAIF. This note records exactly which source is compiled and how it differs from what NAIF distributes. The `naif-source-check` workflow enforces it: the job fails if the compiled source differs from NAIF's package in any file other than the labeled patches below.
+
+## What is compiled
+
+`scripts/build-cspice.sh` downloads NAIF's N0066 CSPICE package (Mac, Intel, 64 bit) from the NAIF server, checks it against a pinned SHA-256, applies the patch set in `patches/`, and compiles every C file under `src/cspice`. This project does not copy the Toolkit source, its documentation, or its utility programs into this repository; it ships only the compiled library, its own wrapper, and the four small patch files.
+
+| Item | Value |
+| --- | --- |
+| Package | `https://naif.jpl.nasa.gov/pub/naif/misc/toolkit_N0066/C/MacIntel_OSX_AppleC_64bit/packages/cspice.tar.Z` |
+| SHA-256 | `f5d48c4b0d558c5d71e8bf6fcdf135b0943210c1ff91f8191dfc447419a6b12e` |
+| Toolkit version | N0066 |
+
+NAIF's platform packages share their C source apart from a few platform identifiers (`SpiceZpl.h`, `zzplatfm.c`, and the logical unit count in `fndlun.c`). The Mac package is used because the artifacts were first built from it, so this build reports NAIF's Mac platform identifiers. Moving to another platform package is a deliberate change that needs a rebuild and the test suite.
+
+## Changes this project makes
+
+Four files are patched, all for one reason: WebAssembly requires a function's definition to match the way its callers declare it, and requires the POSIX declarations the f2c runtime uses to be visible. Each patched file begins with a header comment stating that it is modified, what changed, that the change is not NAIF's, and that NAIF does not support modified code.
+
+| File | Change |
+| --- | --- |
+| `rsfe.c` | `zzsetnnread_` returns `int` in place of `void` |
+| `s_cat.c` | `s_cat` returns `int` in place of `void` |
+| `s_copy.c` | `s_copy` returns `int` in place of `void` |
+| `fio.h` | Includes `unistd.h` when compiling with Emscripten |
+
+These changes originated in the arturania/cspice GitHub fork, which this project compiled before it moved to NAIF's package. The build also adds two lint directives to the top of the generated JavaScript glue and chooses which routines to export.
+
+## History: the fork
+
+Until this change the build fetched the arturania/cspice fork at commit `53bce326267dd2d6d567de92b15869c9ed7d0629`. A file by file comparison with NAIF's N0066 Mac package found 2,179 files identical, six changed, and one added: the four changes above, `extern` added to the prototypes in `SpiceZpr.h` (for a Windows DLL build), a comment block added to `writln.c`, and an added `erf.c`. None was labeled as modified. The three that WebAssembly does not need are no longer part of the build. The `rebuild-wasm` workflow builds both ways with the same compiler and reports whether the results are byte-identical.
+
+## Getting the Toolkit
+
+To obtain the SPICE Toolkit, its documentation, and SPICE kernels, go to NAIF: https://naif.jpl.nasa.gov/naif/toolkit.html. Use of SPICE is governed by NAIF's rules: https://naif.jpl.nasa.gov/naif/rules.html. Modified code is not supported by NAIF; anyone who needs NAIF support should use the Toolkit from NAIF.

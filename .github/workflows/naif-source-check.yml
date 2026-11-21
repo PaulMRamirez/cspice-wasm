@@ -1,0 +1,47 @@
+name: naif-source-check
+
+# Checks that the source this project compiles is the N0066 Toolkit as NAIF
+# distributes it, apart from the labeled patch set in patches/. It runs the
+# fetch, verify, and patch stage of scripts/build-cspice.sh, extracts a second,
+# untouched copy of the same NAIF package, and compares the two file by file.
+# The job fails if any file differs other than the patched ones, or if a
+# patched file lacks its MODIFIED header.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/naif-source-check.yml
+      - scripts/build-cspice.sh
+      - patches/**
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch, verify, and patch the NAIF package
+        run: CSPICE_FETCH_ONLY=1 bash scripts/build-cspice.sh
+      - name: Compare with an untouched copy
+        run: |
+          set -e
+          mkdir pristine
+          gzip -dc vendor/naif-n0066/cspice.tar.Z | tar xf - -C pristine
+          expected="$(grep -o 'PATCHED_FILES="[^"]*"' scripts/build-cspice.sh | cut -d'"' -f2 | tr ' ' '\n' | sort -u | tr '\n' ' ')"
+          changed="$( (diff -rq pristine/cspice vendor/naif-n0066/cspice || true) | grep -v '\.orig' | sed -E 's/^Files (.*) and .* differ$/\1/; s/^Only in .*: //' | xargs -n1 basename | sort -u | tr '\n' ' ')"
+          total="$(find pristine/cspice/src/cspice pristine/cspice/include -type f \( -name '*.c' -o -name '*.h' \) | wc -l)"
+          echo "source files in the NAIF package (src/cspice and include): $total"
+          echo "expected to differ: $expected"
+          echo "actually differ:    $changed"
+          [ "$expected" = "$changed" ] || { echo "the compiled source differs from NAIF beyond the patch set" >&2; exit 1; }
+          for name in $expected; do
+            for f in vendor/naif-n0066/cspice/src/cspice/$name vendor/naif-n0066/cspice/include/$name; do
+              [ -f "$f" ] || continue
+              head -3 "$f" | grep -q 'MODIFIED for cspice-wasm' || { echo "$f lacks its MODIFIED header" >&2; exit 1; }
+            done
+          done
+          echo "OK: the compiled source is NAIF N0066 plus the labeled patches, and nothing else."

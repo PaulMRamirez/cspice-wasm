@@ -7,16 +7,26 @@ the TypeScript wrapper, the build scripts, and the tests in this repository.
 Third-party material
 
 The files wasm/cspice.wasm and wasm/cspice.mjs are compiled from the CSPICE
-toolkit, which is produced by the Navigation and Ancillary Information Facility
-(NAIF) at the Jet Propulsion Laboratory, California Institute of Technology, under
-contract with NASA. The CSPICE source is obtained through the arturania/cspice
-fork (https://github.com/arturania/cspice), which adds the Emscripten build
-scripts, at the commit pinned in scripts/build-cspice.sh. CSPICE is distributed
-under NAIF's own terms, not under the Apache License; see
-https://naif.jpl.nasa.gov/naif/rules.html before redistributing.
+toolkit, version N0066, which is produced by the Navigation and Ancillary
+Information Facility (NAIF) at the Jet Propulsion Laboratory, California
+Institute of Technology, under contract with NASA. The build downloads NAIF's
+N0066 package from the NAIF server, verifies it against a pinned SHA-256, and
+applies the four patches in patches/ (function return types and one include that
+WebAssembly needs); each patched file states in its header that it is modified.
+docs/cspice-source-provenance.md gives the details, and a CI check fails if the
+compiled source differs from NAIF's in any other way. The artifacts currently
+committed were compiled from the arturania/cspice fork
+(https://github.com/arturania/cspice), from which the patches originate; CI
+builds both ways with one compiler and finds the resulting cspice.wasm identical
+byte for byte.
 
-The file wasm/cspice.wasi.wasm is compiled from the same CSPICE source at the same
-pinned commit by scripts/build-cspice-wasi.sh, for WASI 0.1 and the WebAssembly MVP.
+CSPICE is distributed under NAIF's own terms, not under the Apache License; see
+https://naif.jpl.nasa.gov/naif/rules.html before redistributing. Modified code is
+not supported by NAIF. To obtain the SPICE Toolkit itself, its documentation, and
+kernels, go to https://naif.jpl.nasa.gov/naif/toolkit.html.
+
+The file wasm/cspice.wasi.wasm is compiled from the same NAIF N0066 package with
+the same patches by scripts/build-cspice-wasi.sh, for WASI 0.1 and the WebAssembly MVP.
 It statically links wasi-libc (https://github.com/WebAssembly/wasi-libc, at the commit
 pinned in that script; multi-licensed under the Apache License 2.0 with LLVM
 exceptions, the Apache License 2.0, and the MIT License, with portions from musl

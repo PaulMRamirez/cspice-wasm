@@ -9,6 +9,10 @@ not endorsed by, NAIF, NASA, JPL, or Caltech; see NOTICE for the provenance of t
 CSPICE toolkit it compiles. The package began as the spice layer of the Bessel and
 Cosmolabe projects and was extracted here with its history intact.
 
+To obtain the SPICE Toolkit itself, its documentation, and kernels, go to NAIF at
+https://naif.jpl.nasa.gov/naif/toolkit.html. What this package compiles, and how that
+source differs from NAIF's release, is recorded in docs/cspice-source-provenance.md.
+
 ## Install and develop
 
 The package is not yet published to npm (the name is reserved). Until the first
@@ -72,11 +76,12 @@ agreeing well within 1 metre, and checks that unresolved bodies raise a typed `S
 ## Rebuilding the WASM
 
 `pnpm cspice:build` (which runs `scripts/build-cspice.sh`) needs Emscripten (`emcc`),
-`csh`, and `git`. It fetches the arturania/cspice fork at the commit pinned in the
-script, compiles about 2000 C files into a static library under `vendor/` (ignored),
-and links `wasm/cspice.mjs` plus `wasm/cspice.wasm`. To expose another SPICE routine,
-add its symbol to `scripts/cspice-exports.txt` (shared by both build targets), rebuild,
-and add the typed binding in `src/bindings.ts`. The bounded kernel fixtures under `test/fixtures` are committed,
+`curl`, `gzip`, `tar`, and `patch`. It downloads NAIF's N0066 CSPICE package from the
+NAIF server, verifies its SHA-256, applies the four labeled patches in `patches/`,
+compiles about 2000 C files into a static library under `vendor/` (ignored), and links
+`wasm/cspice.mjs` plus `wasm/cspice.wasm`. To expose another SPICE routine, add its
+symbol to `scripts/cspice-exports.txt` (shared by both build targets), rebuild, and add
+the typed binding in `src/bindings.ts`. The bounded kernel fixtures under `test/fixtures` are committed,
 so the tests run without any download; the `scripts/make-fixture-*.mjs` generators
 that derive them need the full source kernels and are only for regenerating fixtures.
 

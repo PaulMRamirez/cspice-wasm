@@ -16,8 +16,11 @@ import CSpice from '../wasm/cspice.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
-const lskSrc = resolve(repoRoot, 'vendor/cspice/kernels/lsk/latest_leapseconds.tls');
-const spkSrc = resolve(repoRoot, 'vendor/cspice/kernels/spk/de440s.bsp');
+// Full source kernels are not committed and no longer arrive with the CSPICE source.
+// Download naif0012.tls and de440s.bsp from the NAIF generic kernels area into
+// kernels/data/ (ignored) before regenerating this fixture.
+const lskSrc = resolve(repoRoot, 'kernels/data/naif0012.tls');
+const spkSrc = resolve(repoRoot, 'kernels/data/de440s.bsp');
 const outDir = resolve(repoRoot, 'test/fixtures');
 const outSpk = resolve(outDir, 'de440s-inner-cassini.bsp');
 

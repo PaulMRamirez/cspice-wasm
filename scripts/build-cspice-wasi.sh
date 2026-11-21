@@ -25,19 +25,20 @@
 # wasm32 (Ubuntu 24.04: apt-get install clang lld llvm binaryen
 # libclang-rt-18-dev-wasm32). Tested with clang 18.1.3 and binaryen 108; the committed
 # module is byte-identical only with those versions.
-# Environment overrides: CSPICE_COMMIT, WASI_LIBC_COMMIT, CC, AR, NM, OBJCOPY, WASM_OPT,
+# Environment overrides: WASI_LIBC_COMMIT, CC, AR, NM, OBJCOPY, WASM_OPT,
 # WASM_OPT_LEVEL, WASI_SYSROOT (use an existing MVP sysroot instead of building one),
 # STACK_SIZE, JOBS.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VENDOR="$REPO_ROOT/vendor/cspice"
+# The CSPICE source is NAIF's N0066 package plus the labeled patches in patches/,
+# fetched, verified, and patched by the first stage of scripts/build-cspice.sh, so
+# both targets compile exactly the same source.
+NAIF="$REPO_ROOT/vendor/naif-n0066/cspice"
+SRC="$NAIF/src/cspice"
 BUILD="$REPO_ROOT/vendor/wasi-build"
 OUT="$REPO_ROOT/wasm"
-CSPICE_REMOTE="https://github.com/arturania/cspice.git"
-# Keep in step with scripts/build-cspice.sh: both targets compile the same toolkit.
-CSPICE_COMMIT="${CSPICE_COMMIT:-53bce326267dd2d6d567de92b15869c9ed7d0629}"
 WASI_LIBC_REMOTE="https://github.com/WebAssembly/wasi-libc.git"
 # wasi-libc at the wasi-sdk-25 tag, the last line with the plain Makefile build.
 WASI_LIBC_COMMIT="${WASI_LIBC_COMMIT:-574b88da481569b65a237cb80daf9a2d5aeaf82d}"
@@ -70,10 +71,7 @@ fetch_pinned() { # dir remote commit
   fi
 }
 
-if [ ! -d "$VENDOR/src" ]; then
-  echo "Fetching CSPICE source at $CSPICE_COMMIT into vendor/cspice ..."
-  fetch_pinned "$VENDOR" "$CSPICE_REMOTE" "$CSPICE_COMMIT"
-fi
+CSPICE_FETCH_ONLY=1 bash "$REPO_ROOT/scripts/build-cspice.sh"
 
 # 1. A wasi-libc sysroot compiled at -mcpu=mvp. BULK_MEMORY_SOURCES is emptied so that
 #    memcpy, memmove, and memset build as ordinary loops instead of memory.copy and
@@ -95,9 +93,9 @@ else
   fi
 fi
 
-# 2. The CSPICE static library. Same warning set as the fork's mk_wasm.csh; the two
+# 2. The CSPICE static library. Same warning set as the Emscripten target; the two
 #    emulation defines map the libf2c signal and clock calls onto wasi-libc's shims.
-CFLAGS=("${TARGET_FLAGS[@]}" --sysroot="$SYSROOT" -O2 -I"$VENDOR/include"
+CFLAGS=("${TARGET_FLAGS[@]}" --sysroot="$SYSROOT" -O2 -I"$NAIF/include"
   -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS
   -ffile-prefix-map="$REPO_ROOT"=. -w -Wno-implicit-int)
 LIB="$BUILD/libcspice_wasi.a"
@@ -108,7 +106,7 @@ if [ ! -f "$LIB" ]; then
   export OBJ CC
   CFLAGS_STR="${CFLAGS[*]}"
   export CFLAGS_STR
-  ( cd "$VENDOR/src" && ls *.c | xargs -P "$JOBS" -n 16 sh -c '
+  ( cd "$SRC" && ls *.c | xargs -P "$JOBS" -n 16 sh -c '
       for f in "$@"; do
         $CC $CFLAGS_STR -c "$f" -o "$OBJ/${f%.c}.o" || exit 255
       done' sh )
