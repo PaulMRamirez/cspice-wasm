@@ -14,9 +14,11 @@ N0066 package from the NAIF server, verifies it against a pinned SHA-256, and
 applies the four patches in patches/ (function return types and one include that
 WebAssembly needs); each patched file states in its header that it is modified.
 docs/cspice-source-provenance.md gives the details, and a CI check fails if the
-compiled source differs from NAIF's in any other way. Artifacts committed before
-this arrangement were compiled from the arturania/cspice fork
-(https://github.com/arturania/cspice), from which the patches originate.
+compiled source differs from NAIF's in any other way. The artifacts currently
+committed were compiled from the arturania/cspice fork
+(https://github.com/arturania/cspice), from which the patches originate; CI
+builds both ways with one compiler and finds the resulting cspice.wasm identical
+byte for byte.
 
 CSPICE is distributed under NAIF's own terms, not under the Apache License; see
 https://naif.jpl.nasa.gov/naif/rules.html before redistributing. Modified code is
