@@ -198,14 +198,42 @@ stubs it to fail with ENOSYS. The 15 libf2c files that rely on implicit `int` ne
 call. The harness adds that one binding (`bench/spacewasm-host/src/wasi.rs`, adapted
 from the upstream file); with it the interpreter runs the module unmodified.
 
-Node's WASI host is usable but needed a workaround. With default settings Node 22.23.5
-segfaulted in about 1 run in 10 of the smoke test (31 of 40 with `--no-liftoff`, 0 of
-40 with `--liftoff-only`, 0 of 12 with `--single-threaded`). A gdb backtrace puts the
-crash in V8's garbage collector (`IterateTurbofanOptimizedFrame`), entered from a
-memory-pressure report inside `uvwasi_fd_write`, which optimized wasm code had called.
-That is a host defect and not a property of the module, so the smoke test sets
-`--liftoff-only` for itself; after that, 60 consecutive runs passed. It was not reported
-upstream or checked against newer Node releases.
+Node's WASI host is usable on Node 22 only with a workaround, because of a defect in
+that host. On Node 22.23.5 (V8 12.4.254.21) a process running either module in
+`node:wasi` can exit with a segmentation fault (status 139). The cause, read from gdb
+backtraces: V8 lets wasm code call Node's WASI imports through its fast API call path
+(`WasiFunction<...>::FastCallback`), which enters C++ with no JavaScript frame in
+between. uvwasi allocates inside many of those calls (`uvwasi_path_filestat_get`
+resolving a path, `fd_read`, `fd_write`), Node's allocator hook
+(`NgLibMemoryManager::ReallocImpl`) reports each allocation to V8 as external memory,
+and once the reported total is past V8's external memory limit the report itself
+starts a full collection (`Heap::ReportExternalMemoryPressure`). The collector then
+crashes in `CommonFrame::IterateTurbofanOptimizedFrame` while walking the frame that
+made the fast call. A 96.5 MiB linear memory is counted as external memory, so every
+instance of this module puts the process over the limit; a `--trace-gc` run shows an
+"external memory pressure" collection for each instance. The crash is intermittent
+because that collection has to land inside a WASI import call, and where it lands
+depends on timing. Why the frame walk fails was not investigated further.
+
+The trigger is therefore a garbage collection started from inside a fast API call
+made by wasm code, and it does not depend on what the module computes. Two things
+avoid it: running V8 with `--no-turbo-fast-api-calls`, so the imports take the ordinary
+callback path, where a collection is safe (this is what `scripts/wasi-smoke.mjs` sets
+for itself, before compiling anything), or wrapping each import in a plain JavaScript
+function (`(...a) => f(...a)`), so wasm never calls the native function directly. A
+host embedding the module in Node 22 needs one of the two. Node 24.22.3 (V8 13.6) ran
+the same reproduction 30 times without a crash with fast API calls left on.
+
+Measured on Node 22.23.5, x64 Linux. A reproduction that instantiates the command
+driver three times in one process crashed in 88 of 100 runs with the earlier
+workaround (`--liftoff-only`) and in 0 of 100 with `--no-turbo-fast-api-calls`; the
+import wrapping variant passed 30 of 30. The smoke test itself, which runs the driver
+once, crashed far less often and unevenly with the earlier workaround: 2 of 300 runs
+in one batch, 12 of 30 in a batch run minutes earlier, and once in CI. With the new flag it passed 300
+of 300. `--liftoff-only` was a misdiagnosis: the crash had been attributed to the
+optimizing wasm tier, and keeping wasm on the baseline compiler only changed the
+timing. The defect was not reported upstream, and no upstream fix was identified; the
+Node 24 result is an observation, not a traced change.
 
 Not verified: only the calls in the scenario were exercised in the WASI module. The
 other exported routines (frames, CK, SCLK, DSK, geometry finders, the SPK, CK, and DSK

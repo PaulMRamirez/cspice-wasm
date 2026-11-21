@@ -18,14 +18,23 @@ import { fileURLToPath } from 'node:url';
 import { setFlagsFromString } from 'node:v8';
 import { WASI } from 'node:wasi';
 
-// Node 22 can segfault here with its default wasm tiering: node:wasi's fd_read and
-// fd_write allocate, the allocation can report memory pressure and start a garbage
-// collection, and the collector then crashes walking the TurboFan-compiled wasm frame
-// that made the call (seen in gdb as IterateTurbofanOptimizedFrame under
-// uvwasi_fd_write). It is a host bug, intermittent (about 1 run in 10), and independent
-// of this module's contents; keeping V8 on its baseline compiler avoids it, and this
-// test measures values, not speed.
-setFlagsFromString('--liftoff-only');
+// Node 22 (V8 12.4) can segfault while a guest runs in node:wasi. Wasm code reaches
+// the WASI imports through V8's fast API call path, which enters Node's C++ directly
+// with no JavaScript frame in between. Every uvwasi allocation made inside such a call
+// (path resolution, fd_read, fd_write) reports its size to V8 as external memory, and
+// with this module's 96.5 MiB linear memory already counted, that report can pass V8's
+// external memory limit and start a full garbage collection on the spot. The collector
+// then crashes walking the frame that made the fast call (gdb: WasiFunction
+// FastCallback, NgLibMemoryManager::ReallocImpl, Heap::ReportExternalMemoryPressure,
+// MarkCompactCollector::MarkRoots, CommonFrame::IterateTurbofanOptimizedFrame). It is
+// a host defect, independent of this module's contents, and intermittent because the
+// collection only sometimes lands inside a WASI call. Turning fast API calls off sends
+// every WASI import through the ordinary callback path, where a collection is safe.
+// The flag must be set before any wasm module is compiled, so it is set here. An
+// earlier version of this script set --liftoff-only instead, which lowered the crash
+// rate and did not remove it. Node 24 (V8 13.6) does not crash either way. See
+// docs/wasi-mvp-measurements.md.
+setFlagsFromString('--no-turbo-fast-api-calls');
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const fixtures = `${root}test/fixtures`;
