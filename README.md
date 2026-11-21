@@ -35,7 +35,7 @@ Engine factories:
 Engine surface (`SpiceEngine` / `SpiceComputeEngine`):
 
 - Kernels: `furnsh`, `unload`, `kclear`, `ktotal`.
-- Time: `str2et`, `et2utc`, `utc2et`.
+- Time: `str2et`, `et2utc`, `utc2et`, `unitim` (conversion between the uniform time systems TDB, TDT, TAI, and the Julian date forms).
 - Ephemeris: `spkpos`, `spkezr`, `spkposBatch` (zero-copy n*3 positions), `spkezrBatch` (zero-copy n*6 states plus light times, the batched-states primitive that Cosmolabe's frames tier builds on).
 - Two-body math: `oscelt`, `conics`, `prop2b`; SPK Type 13 writeback via `writeSpkType13`.
 - Geometry events: `gfoclt`, `gfdist`, `occult`.
@@ -43,6 +43,8 @@ Engine surface (`SpiceEngine` / `SpiceComputeEngine`):
 - Surface and illumination: `sincpt`, `subpnt`, `ilumin`, `recgeo`, `et2lst`, `readDsk`.
 - Attitude: `twovec`, `m2q`, `q2m`, `raxisa`.
 - Spacecraft clock and CK attitude: `sce2c`/`sct2e` (ET <-> encoded SCLK ticks), `ckgp` (CK pointing query), and `writeCk03`, which writes a CK Type 3 segment (discrete quaternions plus optional angular rate, linear interpolation) and furnshes it so the attitude history is queryable through the same `pxform`/`ckgp` path. A class-3 frame (defined in an FK with `FRAME_<id>_CLASS=3`, `CK_<id>_SCLK`, `CK_<id>_SPK`) drives the scene orientation from a furnished C-kernel. See `ck.test.ts` for the write-then-read round trip and `scripts/make-fixture-ck.mjs` for the demo CK generator.
+- Spacecraft clock strings and partitions: `scencd`/`scdecd` (clock string <-> encoded SCLK ticks, with the partition number), `scs2e`/`sce2s` (clock string <-> ET), `sctiks`/`scfmt` (clock string without a partition <-> tick count), and `scpart` (the tick values at which each partition starts and stops).
+- Kernel pool readers: `dtpool` (existence, size, and type of a variable), `gdpool`, `gipool`, and `gcpool` (its double precision, integer, or character values, optionally a window of them). Each reader returns `null` when the variable is absent or of the other type. With these a caller can read an SCLK kernel's fields (moduli, offsets, coefficients, partitions) from the pool; nothing has to parse the kernel text. See `sclk-pool.test.ts`.
 - Time series: `evalSeries` plus `runEvalSpec`, `gridEpochs`, `PROVIDER_CATALOG` for one-round-trip, cancellable sweeps over a grid.
 
 Types include `Vec3`, `StateVector`, `PositionResult`, `CartesianState`, `OsculatingElements`, `AberrationCorrection`, `Mat3`, `StateBatchArrays`, and the located `SpiceError`. For in-process synchronous consumers (the frames tier, conformance rigs) the package also exports `SpiceBindings` and `createSpiceBindings`, the typed marshaling layer beneath the promise surface, including `namfrm` and `frmnam` for frame id resolution.
@@ -65,13 +67,16 @@ come from. Kernels are never embedded in the build.
 ## Tests
 
 Tests live in `src/*.test.ts` (spice, batch, dsk, geometry, geodetic,
-occultation, propagation, eval-series, ck). The `ck.test.ts` round trip writes a known
+occultation, propagation, eval-series, ck, sclk-pool). The `ck.test.ts` round trip writes a known
 attitude profile to a CK Type 3 segment, furnshes it, and asserts both `ckgp` and
 `pxform(frame, J2000)` against the validated `q2m` quaternion convention. The acceptance
 test (`spice.test.ts`) loads
 `naif0012.tls` plus a de440s SPK and asserts `spkpos` of Saturn barycenter (6) relative
 to the Sun (10) in J2000 at 2004-07-01 against a NAIF reference pinned from de440s,
 agreeing well within 1 metre, and checks that unresolved bodies raise a typed `SpiceError`.
+`sclk-pool.test.ts` parses the committed text kernels itself (the demo SCLK kernel, the
+leapseconds kernel, the demo frame kernel) and holds the pool readers, `scpart`, the
+clock string conversions, and `unitim` to what the kernel text says.
 
 ## Rebuilding the WASM
 

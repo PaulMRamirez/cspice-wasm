@@ -81,6 +81,15 @@ last a second `furnsh_c` of the leapseconds kernel.
 | Guest stack | 1 MiB at the bottom of memory (`--stack-first`) | 5 MiB |
 | Feature set | Wasm 1.0 plus mutable globals, every opcode scanned | includes the DataCount section (bulk memory) |
 
+The table and the run measurements below describe the module as it was when they were
+taken (sha256 `0f8dd56b...1317c50`). The export list has since gained nine routines
+(`scencd_c`, `scdecd_c`, `sctiks_c`, `scfmt_c`, `scpart_c`, `gdpool_c`, `gipool_c`,
+`gcpool_c`, `dtpool_c`), which keeps a little more of the library in the link. The
+committed module is now 1,468,086 bytes with 1,083 defined functions, 133 exports,
+492,077 Wasm instructions, and 269,926 data bytes (sha256 `11fc02ad...e2bb801f`);
+the declared memory, imports, and feature set are unchanged. The run measurements in
+sections 3 and 4 were not repeated for it.
+
 The 15 imports are `clock_time_get`, `fd_close`, `fd_fdstat_get`,
 `fd_fdstat_set_flags`, `fd_filestat_get`, `fd_prestat_get`, `fd_prestat_dir_name`,
 `fd_read`, `fd_renumber`, `fd_seek`, `fd_write`, `path_filestat_get`, `path_open`,

@@ -23,6 +23,15 @@ import {
 
 const KERNEL_DIR = '/kernels';
 
+// Output buffer for SCLK strings. A clock string is a partition number, a slash, and
+// up to ten fields with delimiters; 128 bytes holds any clock CSPICE can decode.
+const SCLK_STRING_LEN = 128;
+// The most partitions CSPICE keeps for one clock (MXPART in the SCLK routines), and
+// therefore the room scpart_c needs in its output arrays.
+const SCLK_MAX_PARTITIONS = 9999;
+// Kernel pool character values are at most 80 characters, plus the terminator.
+const POOL_STRING_LEN = 81;
+
 export class SpiceBindings {
   // The stack of active per-call allocation scopes. str() (and any scratch()
   // allocation) registers its pointer in the innermost scope, and scope() frees
@@ -738,6 +747,203 @@ export class SpiceBindings {
       this.call('sct2e_c', sc, sclkdp, out);
       this.checkFailed();
       return this.readDouble(out);
+    });
+  }
+
+  /**
+   * Format an encoded SCLK value (ticks since the clock start) as a clock string with
+   * its partition number, for example `1/000000000100.500` (scdecd).
+   */
+  scdecd(sc: number, sclkdp: number): string {
+    return this.scope(() => {
+      const out = this.scratch(SCLK_STRING_LEN);
+      this.call('scdecd_c', sc, sclkdp, SCLK_STRING_LEN, out);
+      this.checkFailed();
+      return this.mod.UTF8ToString(out);
+    });
+  }
+
+  /**
+   * Encode a clock string, with or without a leading partition number, as ticks since
+   * the clock start (scencd). Without a partition number the first partition in which
+   * the string is valid is used.
+   */
+  scencd(sc: number, sclkch: string): number {
+    return this.scope(() => {
+      const out = this.scratch(8);
+      this.call('scencd_c', sc, this.str(sclkch), out);
+      this.checkFailed();
+      return this.readDouble(out);
+    });
+  }
+
+  /** Clock string (optionally with a partition number) to ET, seconds past J2000 TDB (scs2e). */
+  scs2e(sc: number, sclkch: string): number {
+    return this.scope(() => {
+      const out = this.scratch(8);
+      this.call('scs2e_c', sc, this.str(sclkch), out);
+      this.checkFailed();
+      return this.readDouble(out);
+    });
+  }
+
+  /** ET, seconds past J2000 TDB, to a clock string with its partition number (sce2s). */
+  sce2s(sc: number, et: number): string {
+    return this.scope(() => {
+      const out = this.scratch(SCLK_STRING_LEN);
+      this.call('sce2s_c', sc, et, SCLK_STRING_LEN, out);
+      this.checkFailed();
+      return this.mod.UTF8ToString(out);
+    });
+  }
+
+  /**
+   * Convert a clock string without a partition number to a tick count (sctiks). The
+   * string is read as a duration or as a time since the start of a partition, so the
+   * result is not offset by earlier partitions; use scencd for an absolute encoding.
+   */
+  sctiks(sc: number, clkstr: string): number {
+    return this.scope(() => {
+      const out = this.scratch(8);
+      this.call('sctiks_c', sc, this.str(clkstr), out);
+      this.checkFailed();
+      return this.readDouble(out);
+    });
+  }
+
+  /** Format a tick count as a clock string with no partition number (scfmt); the inverse of sctiks. */
+  scfmt(sc: number, ticks: number): string {
+    return this.scope(() => {
+      const out = this.scratch(SCLK_STRING_LEN);
+      this.call('scfmt_c', sc, ticks, SCLK_STRING_LEN, out);
+      this.checkFailed();
+      return this.mod.UTF8ToString(out);
+    });
+  }
+
+  /**
+   * The partition boundaries of a spacecraft clock (scpart): the tick values at which
+   * each partition starts and stops, in partition order. These are the SCLK kernel's
+   * SCLK_PARTITION_START and SCLK_PARTITION_END values, rounded to whole ticks.
+   */
+  scpart(sc: number): { pstart: number[]; pstop: number[] } {
+    return this.scope(() => {
+      const n = this.scratch(4);
+      const pstart = this.scratch(SCLK_MAX_PARTITIONS * 8);
+      const pstop = this.scratch(SCLK_MAX_PARTITIONS * 8);
+      this.call('scpart_c', sc, n, pstart, pstop);
+      this.checkFailed();
+      const count = Math.min(this.readInt(n), SCLK_MAX_PARTITIONS);
+      const starts: number[] = [];
+      const stops: number[] = [];
+      for (let i = 0; i < count; i++) {
+        starts.push(this.readDouble(pstart + i * 8));
+        stops.push(this.readDouble(pstop + i * 8));
+      }
+      return { pstart: starts, pstop: stops };
+    });
+  }
+
+  /**
+   * Describe a kernel pool variable (dtpool): whether it exists, how many values it
+   * holds, and whether they are numeric ('N') or character ('C'). When the variable
+   * is absent, `found` is false, `n` is 0, and `type` is 'X'.
+   */
+  dtpool(name: string): { found: boolean; n: number; type: 'C' | 'N' | 'X' } {
+    return this.scope(() => {
+      const found = this.scratch(4);
+      const n = this.scratch(4);
+      // dtpool_c writes exactly one character and no terminator.
+      const type = this.scratch(4);
+      this.mod.setValue(type, 0, 'i32');
+      this.call('dtpool_c', this.str(name), found, n, type);
+      this.checkFailed();
+      if (this.readInt(found) === 0) return { found: false, n: 0, type: 'X' as const };
+      const code = String.fromCharCode(this.mod.getValue(type, 'i8'));
+      return { found: true, n: this.readInt(n), type: code === 'C' ? ('C' as const) : ('N' as const) };
+    });
+  }
+
+  /**
+   * How many values a pool reader should ask for: the caller's `room`, or everything
+   * from `start` to the end of the variable. Null when the variable is not in the pool
+   * or does not hold values of the wanted type, 0 when there is nothing to read.
+   */
+  private poolRoom(name: string, type: 'C' | 'N', start: number, room: number | undefined): number | null {
+    const info = this.dtpool(name);
+    if (!info.found || info.type !== type) return null;
+    if (room !== undefined) return Math.max(0, Math.trunc(room));
+    return Math.max(0, info.n - Math.max(0, start));
+  }
+
+  /**
+   * Read double precision values of a kernel pool variable (gdpool), starting at the
+   * zero-based index `start` and returning at most `room` values (by default, all that
+   * remain; a negative `start` reads from the beginning). Returns null when the
+   * variable is not in the pool or holds character values.
+   */
+  gdpool(name: string, start = 0, room?: number): number[] | null {
+    return this.scope(() => {
+      const want = this.poolRoom(name, 'N', start, room);
+      if (want === null) return null;
+      if (want === 0) return [];
+      const n = this.scratch(4);
+      const found = this.scratch(4);
+      const values = this.scratch(want * 8);
+      this.call('gdpool_c', this.str(name), start, want, n, values, found);
+      this.checkFailed();
+      if (this.readInt(found) === 0) return null;
+      const count = Math.min(this.readInt(n), want);
+      const out: number[] = [];
+      for (let i = 0; i < count; i++) out.push(this.readDouble(values + i * 8));
+      return out;
+    });
+  }
+
+  /**
+   * Read integer values of a kernel pool variable (gipool); arguments and the null
+   * result are as for gdpool. CSPICE rounds each value to the nearest integer and
+   * raises an error, surfaced as a SpiceError, when one does not fit a 32 bit integer;
+   * read such variables (large SCLK moduli, for example) with gdpool.
+   */
+  gipool(name: string, start = 0, room?: number): number[] | null {
+    return this.scope(() => {
+      const want = this.poolRoom(name, 'N', start, room);
+      if (want === null) return null;
+      if (want === 0) return [];
+      const n = this.scratch(4);
+      const found = this.scratch(4);
+      const values = this.scratch(want * 4);
+      this.call('gipool_c', this.str(name), start, want, n, values, found);
+      this.checkFailed();
+      if (this.readInt(found) === 0) return null;
+      const count = Math.min(this.readInt(n), want);
+      const out: number[] = [];
+      for (let i = 0; i < count; i++) out.push(this.readInt(values + i * 4));
+      return out;
+    });
+  }
+
+  /**
+   * Read character values of a kernel pool variable (gcpool); arguments are as for
+   * gdpool. Returns null when the variable is not in the pool or holds numeric values.
+   * Pool strings are at most 80 characters, so none is truncated.
+   */
+  gcpool(name: string, start = 0, room?: number): string[] | null {
+    return this.scope(() => {
+      const want = this.poolRoom(name, 'C', start, room);
+      if (want === null) return null;
+      if (want === 0) return [];
+      const n = this.scratch(4);
+      const found = this.scratch(4);
+      const values = this.scratch(want * POOL_STRING_LEN);
+      this.call('gcpool_c', this.str(name), start, want, POOL_STRING_LEN, n, values, found);
+      this.checkFailed();
+      if (this.readInt(found) === 0) return null;
+      const count = Math.min(this.readInt(n), want);
+      const out: string[] = [];
+      for (let i = 0; i < count; i++) out.push(this.mod.UTF8ToString(values + i * POOL_STRING_LEN));
+      return out;
     });
   }
 

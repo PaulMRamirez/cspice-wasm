@@ -8,6 +8,8 @@ malloc free
 tkvrsn_c erract_c errprt_c errdev_c failed_c getmsg_c reset_c
 furnsh_c unload_c kclear_c ktotal_c kdata_c
 str2et_c et2utc_c utc2et_c timout_c sce2c_c sct2e_c scs2e_c sce2s_c deltet_c unitim_c
+scencd_c scdecd_c sctiks_c scfmt_c scpart_c
+gdpool_c gipool_c gcpool_c dtpool_c
 bodn2c_c bodc2n_c bods2c_c bodvrd_c bodvcd_c namfrm_c frmnam_c
 spkpos_c spkezr_c spkez_c spkgps_c
 pxform_c sxform_c
