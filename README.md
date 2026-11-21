@@ -80,10 +80,39 @@ agreeing well within 1 metre, and checks that unresolved bodies raise a typed `S
 NAIF server, verifies its SHA-256, applies the four labeled patches in `patches/`,
 compiles about 2000 C files into a static library under `vendor/` (ignored), and links
 `wasm/cspice.mjs` plus `wasm/cspice.wasm`. To expose another SPICE routine, add its
-symbol to the `EXPORTS` list in the script, rebuild, and add the typed binding in
-`src/bindings.ts`. The bounded kernel fixtures under `test/fixtures` are committed,
+symbol to `scripts/cspice-exports.txt` (shared by both build targets), rebuild, and add
+the typed binding in `src/bindings.ts`. The bounded kernel fixtures under `test/fixtures` are committed,
 so the tests run without any download; the `scripts/make-fixture-*.mjs` generators
 that derive them need the full source kernels and are only for regenerating fixtures.
+
+## Second target: WASI, Wasm MVP (no glue)
+
+`wasm/cspice.wasi.wasm` is the same CSPICE source and the same export list
+(`scripts/cspice-exports.txt`) built as a WASI 0.1 reactor restricted to the WebAssembly
+MVP feature set, for WASI 0.1 runtimes that cannot load the Emscripten artifact. It
+has been run in Node's `node:wasi` and in NASA's
+[SpaceWasm](https://github.com/nasa/SpaceWasm) interpreter; wasmtime has not been
+tried yet. It needs no JS: a host supplies the 15 `wasi_snapshot_preview1` imports,
+calls `_initialize` once, then calls `malloc`, `free`, and the SPICE functions
+directly, and kernels are read by path from a directory the host preopens. The typed
+TypeScript API does not use this module; it is a separate artifact for other hosts.
+
+`pnpm cspice:build:wasi` (`scripts/build-cspice-wasi.sh`) needs clang and wasm-ld with
+the WebAssembly backend, the LLVM binutils, binaryen's `wasm-opt`, `make`, `git`, and
+the compiler-rt builtins for wasm32 (on Ubuntu 24.04: `clang lld llvm binaryen
+libclang-rt-18-dev-wasm32`). It builds its
+own wasi-libc at `-mcpu=mvp`, because stock sysroots use bulk memory, and it also links
+`wasm/cspice-driver.wasi.wasm`, a command-style driver for hosts that only run
+`_start`. `pnpm check:wasi` scans every opcode and fails on anything outside Wasm 1.0
+plus mutable globals; `pnpm test:wasi` loads the module in Node's WASI host and checks
+`str2et_c` and `spkezr_c` against the Emscripten build; `pnpm bench:spacewasm` runs the
+Rust harness in `bench/spacewasm-host` and prints the measurements. The CI job `wasi`
+runs all of it and confirms the committed module is byte-identical to a fresh build.
+
+The module declares 96.5 MiB of initial memory, almost all of it CSPICE's static
+tables, so it is a ground oracle and a measurement subject, not a flight-ready guest.
+The numbers and what they imply are in
+[docs/wasi-mvp-measurements.md](docs/wasi-mvp-measurements.md).
 
 ## Status / limitations
 

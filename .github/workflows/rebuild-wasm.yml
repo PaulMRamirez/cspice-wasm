@@ -51,7 +51,8 @@ jobs:
           git -C /tmp/fork checkout -q 53bce326267dd2d6d567de92b15869c9ed7d0629
           ( cd /tmp/fork/src && csh ./mk_wasm.csh > /tmp/fork-build.log 2>&1 ) || { tail -40 /tmp/fork-build.log; exit 1; }
           mkdir -p /tmp/forkout
-          sed -n '/^EXPORTS=/,/^emcc /p' scripts/build-cspice.sh | sed '$d' > /tmp/link-vars.sh
+          REPO_ROOT="$PWD"
+          sed -n '/^EXPORTS_FILE=/,/^emcc /p' scripts/build-cspice.sh | sed '$d' > /tmp/link-vars.sh
           . /tmp/link-vars.sh
           emcc /tmp/fork/lib/libcspice_wasm.a -o /tmp/forkout/cspice.mjs -O2 \
             -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME=CSpice -s WASM=1 \

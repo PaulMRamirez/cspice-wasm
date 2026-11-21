@@ -1,0 +1,31 @@
+# The exported SPICE surface, shared by scripts/build-cspice.sh (Emscripten) and
+# scripts/build-cspice-wasi.sh (WASI, Wasm MVP). One C symbol per whitespace-separated
+# token, without the leading underscore Emscripten adds; lines starting with # are
+# comments. Extend deliberately: every symbol here is reachable from the typed API in
+# src/bindings.ts.
+
+malloc free
+tkvrsn_c erract_c errprt_c errdev_c failed_c getmsg_c reset_c
+furnsh_c unload_c kclear_c ktotal_c kdata_c
+str2et_c et2utc_c utc2et_c timout_c sce2c_c sct2e_c scs2e_c sce2s_c deltet_c unitim_c
+bodn2c_c bodc2n_c bods2c_c bodvrd_c bodvcd_c namfrm_c frmnam_c
+spkpos_c spkezr_c spkez_c spkgps_c
+pxform_c sxform_c
+getfov_c
+sincpt_c subpnt_c subslr_c ilumin_c
+vnorm_c vsep_c vdist_c recrad_c reclat_c recsph_c convrt_c
+dpr_c rpd_c spd_c clight_c georec_c latrec_c
+dafopr_c dafcls_c dafbfs_c daffna_c dafgs_c dafgn_c dafus_c
+spkopn_c spksub_c spkcls_c
+ckopn_c ckw03_c ckcls_c ckgp_c ckgpav_c
+dasopr_c dascls_c dlabfs_c dlafns_c
+dskobj_c dsksrf_c dskgd_c dskz02_c dskv02_c dskp02_c dskb02_c
+dskw02_c dskmi2_c dskrb2_c
+prop2b_c conics_c oscelt_c oscltx_c
+spkw09_c spkw13_c
+gfdist_c gfsep_c gfposc_c gfoclt_c gfrfov_c gftfov_c occult_c
+ssize_c scard_c wninsd_c wncard_c wnfetd_c
+wnintd_c wnunid_c wndifd_c wnsumd_c
+recgeo_c recpgr_c et2lst_c
+twovec_c m2q_c q2m_c raxisa_c axisar_c eul2m_c m2eul_c mxv_c mtxv_c
+illumf_c phaseq_c edterm_c gfilum_c

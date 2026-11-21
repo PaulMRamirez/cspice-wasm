@@ -35,7 +35,8 @@
       "import": "./dist/worker-core.js"
     },
     "./wasm/cspice.mjs": "./wasm/cspice.mjs",
-    "./wasm/cspice.wasm": "./wasm/cspice.wasm"
+    "./wasm/cspice.wasm": "./wasm/cspice.wasm",
+    "./wasm/cspice.wasi.wasm": "./wasm/cspice.wasi.wasm"
   },
   "types": "./dist/index.d.ts",
   "scripts": {
@@ -44,7 +45,11 @@
     "test": "vitest run",
     "verify": "pnpm typecheck && pnpm build && pnpm test",
     "prepare": "tsc -p tsconfig.build.json",
-    "cspice:build": "bash scripts/build-cspice.sh"
+    "cspice:build": "bash scripts/build-cspice.sh",
+    "cspice:build:wasi": "bash scripts/build-cspice-wasi.sh",
+    "check:wasi": "node scripts/check-wasm-mvp.mjs wasm/cspice.wasi.wasm",
+    "test:wasi": "node --no-warnings scripts/wasi-smoke.mjs",
+    "bench:spacewasm": "bash scripts/wasi-measure.sh"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

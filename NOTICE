@@ -25,6 +25,21 @@ https://naif.jpl.nasa.gov/naif/rules.html before redistributing. Modified code i
 not supported by NAIF. To obtain the SPICE Toolkit itself, its documentation, and
 kernels, go to https://naif.jpl.nasa.gov/naif/toolkit.html.
 
+The file wasm/cspice.wasi.wasm is compiled from the same NAIF N0066 package with
+the same patches by scripts/build-cspice-wasi.sh, for WASI 0.1 and the WebAssembly MVP.
+It statically links wasi-libc (https://github.com/WebAssembly/wasi-libc, at the commit
+pinned in that script; multi-licensed under the Apache License 2.0 with LLVM
+exceptions, the Apache License 2.0, and the MIT License, with portions from musl
+under MIT, cloudlibc under BSD-2-Clause, and dlmalloc under CC0) and the LLVM
+compiler-rt builtins (Apache License 2.0 with LLVM exceptions).
+
+The file bench/spacewasm-host/src/wasi.rs is adapted from the WASI bindings in
+SpaceWasm (https://github.com/nasa/SpaceWasm, crates/spacewasm_tools, v0.8.0-rc.3,
+Copyright 2026 California Institute of Technology, Apache License 2.0), which derive
+in part from wasmtime's wasi-common crate (Apache License 2.0 with LLVM exception).
+The harness in bench/spacewasm-host links the spacewasm, wasi-common, and wiggle
+crates at build time; none of them is redistributed here.
+
 The kernel fixtures under test/fixtures are bounded subsets of, or copies of,
 public NAIF and PDS kernels (leapseconds, planetary constants, a de440s subset,
 Cassini reconstructed ephemeris and instrument kernels, and the New Horizons MU69

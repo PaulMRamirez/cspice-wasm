@@ -9,3 +9,9 @@ vendor/
 # test/fixtures are committed.
 kernels/data/
 node-compile-cache/
+# The WASI command driver is rebuilt by scripts/build-cspice-wasi.sh and uploaded by CI;
+# only the reactor module wasm/cspice.wasi.wasm is committed.
+wasm/cspice-driver.wasi.wasm
+bench/spacewasm-host/target/
+wasi-measurements.json
+wasi-measurements.txt

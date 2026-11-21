@@ -78,35 +78,11 @@ if [ ! -f "$LIB" ]; then
   )
 fi
 
-# The exported SPICE surface. Extend deliberately; every symbol here is reachable
-# from the typed API in src/bindings.ts.
-EXPORTS='[
-  "_malloc","_free",
-  "_tkvrsn_c","_erract_c","_errprt_c","_errdev_c","_failed_c","_getmsg_c","_reset_c",
-  "_furnsh_c","_unload_c","_kclear_c","_ktotal_c","_kdata_c",
-  "_str2et_c","_et2utc_c","_utc2et_c","_timout_c","_sce2c_c","_sct2e_c","_scs2e_c","_sce2s_c","_deltet_c","_unitim_c",
-  "_bodn2c_c","_bodc2n_c","_bods2c_c","_bodvrd_c","_bodvcd_c","_namfrm_c","_frmnam_c",
-  "_spkpos_c","_spkezr_c","_spkez_c","_spkgps_c",
-  "_pxform_c","_sxform_c",
-  "_getfov_c",
-  "_sincpt_c","_subpnt_c","_subslr_c","_ilumin_c",
-  "_vnorm_c","_vsep_c","_vdist_c","_recrad_c","_reclat_c","_recsph_c","_convrt_c",
-  "_dpr_c","_rpd_c","_spd_c","_clight_c","_georec_c","_latrec_c",
-  "_dafopr_c","_dafcls_c","_dafbfs_c","_daffna_c","_dafgs_c","_dafgn_c","_dafus_c",
-  "_spkopn_c","_spksub_c","_spkcls_c",
-  "_ckopn_c","_ckw03_c","_ckcls_c","_ckgp_c","_ckgpav_c",
-  "_dasopr_c","_dascls_c","_dlabfs_c","_dlafns_c",
-  "_dskobj_c","_dsksrf_c","_dskgd_c","_dskz02_c","_dskv02_c","_dskp02_c","_dskb02_c",
-  "_dskw02_c","_dskmi2_c","_dskrb2_c",
-  "_prop2b_c","_conics_c","_oscelt_c","_oscltx_c",
-  "_spkw09_c","_spkw13_c",
-  "_gfdist_c","_gfsep_c","_gfposc_c","_gfoclt_c","_gfrfov_c","_gftfov_c","_occult_c",
-  "_ssize_c","_scard_c","_wninsd_c","_wncard_c","_wnfetd_c",
-  "_wnintd_c","_wnunid_c","_wndifd_c","_wnsumd_c",
-  "_recgeo_c","_recpgr_c","_et2lst_c","_georec_c",
-  "_twovec_c","_m2q_c","_q2m_c","_raxisa_c","_axisar_c","_eul2m_c","_m2eul_c","_mxv_c","_mtxv_c",
-  "_illumf_c","_phaseq_c","_edterm_c","_gfilum_c"
-]'
+# The exported SPICE surface lives in scripts/cspice-exports.txt, shared with the WASI
+# target (scripts/build-cspice-wasi.sh) so the two builds stay in step. Extend it
+# deliberately; every symbol there is reachable from the typed API in src/bindings.ts.
+EXPORTS_FILE="$REPO_ROOT/scripts/cspice-exports.txt"
+EXPORTS="[$(grep -v '^#' "$EXPORTS_FILE" | tr -s ' \t\n' '\n' | sed '/^$/d; s/.*/"_&"/' | paste -sd, -)]"
 
 RUNTIME_METHODS='["FS","ccall","cwrap","getValue","setValue","UTF8ToString","stringToUTF8","lengthBytesUTF8","writeArrayToMemory"]'
 

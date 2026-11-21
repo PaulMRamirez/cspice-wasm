@@ -1,0 +1,27 @@
+# Ground-side host harness: loads the WASI (Wasm MVP) CSPICE reactor in NASA's SpaceWasm
+# interpreter and measures what it costs. Not part of the npm package; built only by
+# `pnpm bench:spacewasm` and the wasi CI job. Versions are pinned exactly, and
+# Cargo.lock is committed, so the numbers in docs/wasi-mvp-measurements.md are
+# reproducible.
+[package]
+name = "cspice-spacewasm-host"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.87"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+spacewasm = "=0.8.0-rc.3"
+# The WASI 0.1 system calls, the same crates and versions `spacewasm run` binds.
+wasi-common = { version = "=28.0.1", default-features = false, features = ["sync"] }
+wiggle = { version = "=28.0.1", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+
+# Standalone: not a member of any enclosing workspace.
+[workspace]
