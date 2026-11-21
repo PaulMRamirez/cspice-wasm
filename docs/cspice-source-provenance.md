@@ -17,6 +17,19 @@ The committed `wasm/cspice.wasm` and `wasm/cspice.mjs` are the output of that sc
 
 NAIF's platform packages share their C source apart from a few platform identifiers (`SpiceZpl.h`, `zzplatfm.c`, and the logical unit count in `fndlun.c`). The Mac package is used because the artifacts were first built from it, so this build reports NAIF's Mac platform identifiers. Moving to another platform package is a deliberate change that needs a rebuild and the test suite.
 
+## Reproduced outside CI
+
+The byte for byte claim has also been checked away from GitHub's runners. On 21 November 2026, on an Ubuntu 24.04.5 x86-64 machine that was not a GitHub Actions runner, a fresh checkout of commit `3a9486a` was built with Emscripten 7.0.0 installed through emsdk (`emsdk install 7.0.0`, which reports release `777e6e5db7b4990bcaeb1b9998ed642cc84e6629`), from the NAIF package downloaded at that time and checked against the pinned SHA-256. `bash scripts/build-cspice.sh` produced the committed files exactly:
+
+| File | Bytes | SHA-256 of the local build and of the committed file |
+| --- | --- | --- |
+| `wasm/cspice.wasm` | 1,411,926 | `c69dbe9cc73f4df982fc0e3eed247f918d45a13877cc0f1284730a5281cdb028` |
+| `wasm/cspice.mjs` | 71,176 | `ce26f272e2964eb52ee97c5af10905c24c0ebcda5d237877b0178cfd4f507cef` |
+
+On the same machine `bash scripts/build-cspice-wasi.sh`, with Ubuntu's clang 18.1.3 and binaryen 108 and a wasi-libc built by the script, reproduced `wasm/cspice.wasi.wasm` exactly as well (1,468,086 bytes, SHA-256 `11fc02ada9d5e264b41eda6f22f4a5ec713cb5d927b25e6c4cfd0edfe2bb801f`).
+
+This is one machine on one day, of the same operating system family and architecture as the CI runner. It shows that the build does not depend on anything particular to the runner image; it says nothing about other hosts (macOS, or Linux on arm64), where emsdk installs different compiler binaries and the result has not been compared.
+
 ## Changes this project makes
 
 Four files are patched, all for one reason: WebAssembly requires a function's definition to match the way its callers declare it, and requires the POSIX declarations the f2c runtime uses to be visible. Each patched file begins with a header comment stating that it is modified, what changed, that the change is not NAIF's, and that NAIF does not support modified code.
