@@ -1,0 +1,36 @@
+--- a/rsfe.c
++++ b/rsfe.c
+@@ -1,4 +1,12 @@
+ /*
++   MODIFIED for cspice-wasm (https://github.com/PaulMRamirez/cspice-wasm).
++   This file differs from the NAIF CSPICE N0066 Toolkit: zzsetnnread_ returns int in place of void, so that its definition matches how f2c-generated callers declare it, which WebAssembly requires.
++   The change is applied by the cspice-wasm project (it originated in the
++   arturania/cspice fork), not by NAIF, and modified
++   code is not supported by NAIF. Obtain the SPICE Toolkit from
++   https://naif.jpl.nasa.gov/naif/toolkit.html.
++*/
++/*
+ -Procedure rsfe ( SPICE version of f2c library file rsfe.c )
+ 
+ -Abstract
+@@ -57,7 +65,7 @@
+ static logical read_non_native = 0;
+ 
+ logical zzcheckeol ( int ch );
+-void    zzsetnnread_( logical * on );
++int     zzsetnnread_( logical * on );
+ 
+ /*
+ 
+@@ -417,9 +425,10 @@
+ -&
+ */
+ 
+-void zzsetnnread_( logical * on )
++int zzsetnnread_( logical * on )
+    {
+    read_non_native = *on;
++   return 0;
+    }
+ 
+ 

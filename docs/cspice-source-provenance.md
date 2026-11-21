@@ -1,42 +1,36 @@
 # CSPICE source provenance
 
-The WebAssembly artifacts in `wasm/` are compiled from the CSPICE Toolkit, version N0066, produced by NAIF. This note records exactly which source is compiled and how it differs from what NAIF distributes, so that the project can state it plainly and so that NAIF's rule about labeling modified code can be met. The facts below come from the `naif-source-check` workflow, which downloads the N0066 packages from the NAIF server and compares them file by file (line endings and trailing whitespace ignored) with the source this project builds.
+The WebAssembly artifacts in `wasm/` are compiled from the CSPICE Toolkit, version N0066, produced by NAIF. This note records exactly which source is compiled and how it differs from what NAIF distributes. The `naif-source-check` workflow enforces it: the job fails if the compiled source differs from NAIF's package in any file other than the labeled patches below.
 
 ## What is compiled
 
-`scripts/build-cspice.sh` fetches the arturania/cspice GitHub fork at commit `53bce326267dd2d6d567de92b15869c9ed7d0629` and compiles every C file under its `src/` directory. That fork is NAIF's N0066 package for Mac, Intel, 64 bit, with a small number of changes by the fork's author. This project does not copy the Toolkit source, its documentation, or its utility programs into this repository; it ships only the compiled library and its own wrapper.
+`scripts/build-cspice.sh` downloads NAIF's N0066 CSPICE package (Mac, Intel, 64 bit) from the NAIF server, checks it against a pinned SHA-256, applies the patch set in `patches/`, and compiles every C file under `src/cspice`. This project does not copy the Toolkit source, its documentation, or its utility programs into this repository; it ships only the compiled library, its own wrapper, and the four small patch files.
 
-## Comparison with NAIF's N0066 packages
+| Item | Value |
+| --- | --- |
+| Package | `https://naif.jpl.nasa.gov/pub/naif/misc/toolkit_N0066/C/MacIntel_OSX_AppleC_64bit/packages/cspice.tar.Z` |
+| SHA-256 | `f5d48c4b0d558c5d71e8bf6fcdf135b0943210c1ff91f8191dfc447419a6b12e` |
+| Toolkit version | N0066 |
 
-| Compared with | Identical files | Differing files | Files only in the fork |
-| --- | --- | --- | --- |
-| NAIF N0066, MacIntel_OSX_AppleC_64bit | 2,179 | 6 | 1 |
-| NAIF N0066, PC_Linux_GCC_64bit | 2,176 | 9 | 1 |
+NAIF's platform packages share their C source apart from a few platform identifiers (`SpiceZpl.h`, `zzplatfm.c`, and the logical unit count in `fndlun.c`). The Mac package is used because the artifacts were first built from it, so this build reports NAIF's Mac platform identifiers. Moving to another platform package is a deliberate change that needs a rebuild and the test suite.
 
-The three extra differences against the Linux package (`SpiceZpl.h`, `zzplatfm.c`, `fndlun.c`) are NAIF's own platform variants, not edits: the Mac package identifies itself as a Mac build and allows 63 logical units where the Linux package allows 99. One consequence is that this WebAssembly build reports NAIF's Mac platform identifiers.
+## Changes this project makes
 
-## Changes made by the fork (not by NAIF, and not by this project)
+Four files are patched, all for one reason: WebAssembly requires a function's definition to match the way its callers declare it, and requires the POSIX declarations the f2c runtime uses to be visible. Each patched file begins with a header comment stating that it is modified, what changed, that the change is not NAIF's, and that NAIF does not support modified code.
 
-| File | Change | Why (from the fork's commit history) |
-| --- | --- | --- |
-| `include/SpiceZpr.h` | `extern` added to every prototype; a guarded include of `SpiceCK.h` | Building a Windows DLL |
-| `include/fio.h` | Includes `unistd.h` when compiling with Emscripten | WebAssembly build |
-| `src/rsfe.c` | `zzsetnnread_` returns `int` in place of `void` | WebAssembly build, which needs matching function signatures |
-| `src/s_cat.c` | `s_cat` returns `int` in place of `void` | Same |
-| `src/s_copy.c` | `s_copy` returns `int` in place of `void` | Same |
-| `src/writln.c` | A comment block added; no code change | Not stated |
-| `src/erf.c` | Added file: `erf` and `erfc` from Sun Microsystems' freely distributable math library, with its notice | Not stated |
+| File | Change |
+| --- | --- |
+| `rsfe.c` | `zzsetnnread_` returns `int` in place of `void` |
+| `s_cat.c` | `s_cat` returns `int` in place of `void` |
+| `s_copy.c` | `s_copy` returns `int` in place of `void` |
+| `fio.h` | Includes `unistd.h` when compiling with Emscripten |
 
-None of these files carries a header note saying it was modified. NAIF's rules ask that modified Toolkit code say so in its header, and NAIF does not support modified code; anyone needing NAIF support should use the Toolkit from NAIF.
+These changes originated in the arturania/cspice GitHub fork, which this project compiled before it moved to NAIF's package. The build also adds two lint directives to the top of the generated JavaScript glue and chooses which routines to export.
 
-## Changes made by this project
+## History: the fork
 
-None to the CSPICE source. The build adds two lint directives to the top of the generated JavaScript glue, and the choice of which routines to export.
+Until this change the build fetched the arturania/cspice fork at commit `53bce326267dd2d6d567de92b15869c9ed7d0629`. A file by file comparison with NAIF's N0066 Mac package found 2,179 files identical, six changed, and one added: the four changes above, `extern` added to the prototypes in `SpiceZpr.h` (for a Windows DLL build), a comment block added to `writln.c`, and an added `erf.c`. None was labeled as modified. The three that WebAssembly does not need are no longer part of the build. The `rebuild-wasm` workflow builds both ways with the same compiler and reports whether the results are byte-identical.
 
 ## Getting the Toolkit
 
-To obtain the SPICE Toolkit, its documentation, and SPICE kernels, go to NAIF: https://naif.jpl.nasa.gov/naif/toolkit.html. Use of SPICE is governed by NAIF's rules: https://naif.jpl.nasa.gov/naif/rules.html.
-
-## A cleaner arrangement, not yet done
-
-The build could fetch N0066 directly from the NAIF server and apply this project's own small patch set for the few files WebAssembly needs (the three return type changes and the `fio.h` include), with each patched file labeled as modified. That would remove the dependency on a third-party fork and make the labeling explicit. It changes the build inputs, so it needs a rebuild and the full test suite before it replaces the current arrangement.
+To obtain the SPICE Toolkit, its documentation, and SPICE kernels, go to NAIF: https://naif.jpl.nasa.gov/naif/toolkit.html. Use of SPICE is governed by NAIF's rules: https://naif.jpl.nasa.gov/naif/rules.html. Modified code is not supported by NAIF; anyone who needs NAIF support should use the Toolkit from NAIF.

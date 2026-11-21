@@ -2,7 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
-# Vendored CSPICE source and the static library are bulk, rebuilt by
+# The downloaded NAIF package and the static library are bulk, rebuilt by
 # scripts/build-cspice.sh, never committed. The linked artifacts in wasm/ are.
 vendor/
 # Full kernels downloaded for fixture generation; the bounded fixtures under
