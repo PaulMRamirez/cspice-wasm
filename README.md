@@ -117,7 +117,9 @@ that derive them need the full source kernels and are only for regenerating fixt
 MVP feature set, for WASI 0.1 runtimes that cannot load the Emscripten artifact. It
 has been run in Node's `node:wasi` and in NASA's
 [SpaceWasm](https://github.com/nasa/SpaceWasm) interpreter; wasmtime has not been
-tried yet. It needs no JS: a host supplies the 15 `wasi_snapshot_preview1` imports,
+tried yet. Node 22 needs a workaround for a crash in its WASI host (a garbage
+collection inside a fast API call; see the measurements note); Node 24 did not show it.
+It needs no JS: a host supplies the 15 `wasi_snapshot_preview1` imports,
 calls `_initialize` once, then calls `malloc`, `free`, and the SPICE functions
 directly, and kernels are read by path from a directory the host preopens. The typed
 TypeScript API does not use this module; it is a separate artifact for other hosts.
